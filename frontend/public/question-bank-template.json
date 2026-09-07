@@ -1,0 +1,16 @@
+{
+  "questions": [
+    {
+      "module": "reading",
+      "task_type": "multiple_choice",
+      "question_type": "single_choice",
+      "passage": "Paste a passage you are legally allowed to use.",
+      "prompt": "What is the writer's main point?",
+      "options": ["Option A", "Option B", "Option C", "Option D"],
+      "correct_answer": "Option B",
+      "explanation": "Explain the evidence for the answer.",
+      "tags": ["main idea", "practice"],
+      "source_name": "My private question bank"
+    }
+  ]
+}

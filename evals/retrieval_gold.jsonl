@@ -1,0 +1,13 @@
+{"id":"q001","query":"写作 Task 2 怎样才算完整回应题目？","expected_chunk_ids":["ielts-writing-task-response"],"language":"zh","criterion":"task_achievement"}
+{"id":"q002","query":"How is a clear position judged in Task 2?","expected_chunk_ids":["ielts-writing-task-response"],"language":"en","criterion":"task_achievement"}
+{"id":"q003","query":"段落逻辑和衔接词属于哪个评分维度？","expected_chunk_ids":["ielts-writing-coherence"],"language":"zh","criterion":"coherence_cohesion"}
+{"id":"q004","query":"What does mechanical use of cohesive devices affect?","expected_chunk_ids":["ielts-writing-coherence"],"language":"en","criterion":"coherence_cohesion"}
+{"id":"q005","query":"雅思写作如何评价词汇搭配准确性？","expected_chunk_ids":["ielts-writing-lexical"],"language":"zh","criterion":"lexical_resource"}
+{"id":"q006","query":"Which criterion covers collocation and word formation?","expected_chunk_ids":["ielts-writing-lexical"],"language":"en","criterion":"lexical_resource"}
+{"id":"q007","query":"句型多样性和标点错误影响哪项分数？","expected_chunk_ids":["ielts-writing-grammar"],"language":"zh","criterion":"grammar_accuracy"}
+{"id":"q008","query":"Where are sentence variety and punctuation assessed?","expected_chunk_ids":["ielts-writing-grammar"],"language":"en","criterion":"grammar_accuracy"}
+{"id":"q009","query":"观点缺少例证会影响什么？","expected_chunk_ids":["ielts-writing-task-response"],"language":"zh","criterion":"task_achievement"}
+{"id":"q010","query":"Does paragraphing belong to lexical resource?","expected_chunk_ids":["ielts-writing-coherence"],"language":"en","criterion":"coherence_cohesion"}
+{"id":"q011","query":"拼写和构词错误对应哪项标准？","expected_chunk_ids":["ielts-writing-lexical"],"language":"zh","criterion":"lexical_resource"}
+{"id":"q012","query":"Which rubric considers errors that impede communication?","expected_chunk_ids":["ielts-writing-grammar"],"language":"en","criterion":"grammar_accuracy"}
+

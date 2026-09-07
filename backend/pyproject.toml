@@ -1,0 +1,55 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "ielts-adaptive-coach-api"
+version = "0.1.0"
+description = "FastAPI, RAG and agent backend for IELTS Adaptive Coach"
+requires-python = ">=3.11,<3.15"
+dependencies = [
+  "alembic>=1.14,<2",
+  "asyncpg>=0.30,<1",
+  "fastapi>=0.115,<1",
+  "fastembed>=0.7,<1",
+  "httpx>=0.28,<1",
+  "langgraph>=1.0,<2",
+  "openai>=2.0,<3",
+  "orjson>=3.10,<4",
+  "ortools>=9.11,<10",
+  "pgvector>=0.3,<1",
+  "pydantic>=2.10,<3",
+  "pydantic-settings>=2.7,<3",
+  "pyjwt>=2.10,<3",
+  "python-multipart>=0.0.20,<1",
+  "redis>=5,<7",
+  "rq>=2,<3",
+  "sqlalchemy[asyncio]>=2.0,<3",
+  "uvicorn[standard]>=0.34,<1",
+]
+
+[project.optional-dependencies]
+documents = ["docling>=2.50,<3"]
+eval = ["ragas>=0.4,<1"]
+dev = [
+  "aiosqlite>=0.21,<1",
+  "pytest>=8.3,<9",
+  "pytest-asyncio>=0.25,<1",
+  "ruff>=0.9,<1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["app"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "B", "UP"]
+ignore = ["B008", "E501"]
