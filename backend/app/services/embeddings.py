@@ -90,7 +90,7 @@ def _load_fastembed_model(model_name: str, cache_path: str):
 
 def _fastembed_vector(text: str, model_name: str, cache_path: Path) -> list[float]:
     model = _load_fastembed_model(model_name, str(cache_path.resolve()))
-    vector = list(next(iter(model.embed([text]))))
+    vector = [float(value) for value in next(iter(model.embed([text])))]
     _validate_dimensions(vector, model_name)
     return vector
 

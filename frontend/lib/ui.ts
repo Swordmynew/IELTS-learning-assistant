@@ -17,6 +17,6 @@ export function formatDate(date: string) {
 
 export function taskAction(task: StudyTask) {
   if (task.skill === "writing") return "去写作练习";
-  if (task.skill === "vocabulary") return "去词汇测评";
+  if (task.skill === "vocabulary") return "去背单词";
   return `去${skillLabels[task.skill]}题库`;
 }

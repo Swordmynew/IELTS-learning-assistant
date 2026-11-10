@@ -1,0 +1,1 @@
+- When designing UI, let the layout explain itself. DO NOT add excessive texts.

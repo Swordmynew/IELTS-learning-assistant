@@ -213,10 +213,6 @@ def _estimate_from_stored_result(result: dict) -> VocabularyEstimate:
         none_of_above_accuracy=1 - result.get("false_alarm_rate", 0),
         study_focus=study_focus,
         calibration_status="legacy_lexical_decision_result",
-        disclaimer=(
-            "这是旧版二选一测评的兼容结果，CEFR 与词族范围仅作临时参考；"
-            "请完成新版词义选择测评后再用于正式学习判断。"
-        ),
     )
 
 
@@ -299,6 +295,8 @@ async def answer_vocabulary_item(
     ]
     theta, standard_error = estimate_theta(responses)
     row.responses = responses
+    from app.services.personal_knowledge import capture_vocabulary
+    await capture_vocabulary(session, user_id, row)
     row.theta = theta
     row.standard_error = standard_error
 

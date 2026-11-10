@@ -38,7 +38,6 @@ from app.repository import (
     complete_task,
     get_active_plan,
     get_latest_assessment,
-    get_latest_completed_vocabulary_test,
     get_latest_vocabulary_test,
     get_plan,
     get_profile,
@@ -87,7 +86,11 @@ from app.services.vocabulary import (
     start_vocabulary_test,
     vocabulary_test_from_row,
 )
-from app.services.writing import get_writing_grader, round_band, validate_assessment
+from app.services.writing import (
+    get_writing_grader,
+    round_band,
+    validate_assessment,
+)
 
 router = APIRouter(prefix="/api/v1")
 
@@ -260,10 +263,10 @@ async def generate_plan(
     if not stored:
         raise HTTPException(status_code=409, detail="Complete a diagnostic before generating a plan")
     profile, estimates = stored
-    vocabulary_test = await get_latest_completed_vocabulary_test(session, user.id)
-    vocabulary = vocabulary_test.result if vocabulary_test else None
+    from app.services.word_deck import deck
+    vocabulary_learning = (await deck(session, user.id, limit=1))["counts"]
     plan, trace = await asyncio.to_thread(
-        generate_plan_with_trace, profile, estimates, vocabulary
+        generate_plan_with_trace, profile, estimates, None, vocabulary_learning
     )
     await save_plan(session, user.id, plan)
     run = AgentRunRow(
@@ -350,10 +353,12 @@ async def assess_writing(
             days_since_practice=0,
         )
         await save_profile(session, user.id, updated, list(by_skill.values()))
+    from app.services.vocabulary_extraction import enqueue_safely
+    await enqueue_safely(session, user.id, str(assessment.id), "assessment")
     return assessment
 
 
-@router.post("/vocabulary/tests", response_model=VocabularyTest, status_code=201)
+@router.post("/vocabulary/tests", response_model=VocabularyTest, status_code=201, deprecated=True)
 async def create_vocabulary_test(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
@@ -361,7 +366,7 @@ async def create_vocabulary_test(
     return await start_vocabulary_test(session, user.id)
 
 
-@router.get("/vocabulary/tests/{test_id}", response_model=VocabularyTest)
+@router.get("/vocabulary/tests/{test_id}", response_model=VocabularyTest, deprecated=True)
 async def read_vocabulary_test(
     test_id: UUID,
     user: User = Depends(current_user),
@@ -371,7 +376,7 @@ async def read_vocabulary_test(
     return vocabulary_test_from_row(row)
 
 
-@router.post("/vocabulary/tests/{test_id}/responses", response_model=VocabularyTest)
+@router.post("/vocabulary/tests/{test_id}/responses", response_model=VocabularyTest, deprecated=True)
 async def submit_vocabulary_response(
     test_id: UUID,
     body: VocabularyTestAnswer,
@@ -504,6 +509,7 @@ async def list_practice_questions(
     search: str | None = Query(default=None, max_length=200),
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=12, ge=1, le=50),
+    question_id: UUID | None = None,
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> PracticeQuestionPage:
@@ -511,6 +517,8 @@ async def list_practice_questions(
         PracticeQuestionRow.owner_id == user.id
     )
     filters = [access_filter]
+    if question_id:
+        filters.append(PracticeQuestionRow.id == str(question_id))
     if module:
         filters.append(PracticeQuestionRow.module == module.value)
     if task_type:
@@ -615,6 +623,9 @@ async def submit_practice_attempt(
     session.add(attempt)
     await session.commit()
     stored_profile = await get_profile(session, user.id)
+    from app.services.personal_knowledge import capture_attempt
+    await capture_attempt(session, user.id, row, attempt)
+    await session.commit()
     profile_updated = False
     if stored_profile:
         profile, estimates = stored_profile

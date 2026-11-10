@@ -42,7 +42,7 @@ async def test_demo_grader_returns_traceable_four_criterion_result() -> None:
     assert {item.criterion for item in assessment.criteria} == set(CriterionName)
     assert all(item.citations for item in assessment.criteria)
     assert validate_assessment(assessment, essay) == []
-    assert "AI 估分" in assessment.disclaimer
+    assert "disclaimer" not in assessment.model_dump()
 
 
 @pytest.mark.asyncio

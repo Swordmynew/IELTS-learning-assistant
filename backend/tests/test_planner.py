@@ -55,9 +55,11 @@ def test_vocabulary_result_changes_weekly_task_candidates() -> None:
     vocabulary_tasks = [task for task in result.tasks if task.skill == "vocabulary"]
     assert vocabulary_tasks
     assert all(task.task_type == TaskType.vocabulary_review for task in vocabulary_tasks)
-    assert "B1" in result.rationale
+    assert "词汇复习" in result.rationale
+    assert "B1" not in result.rationale
 
 
-def test_plan_requests_assessment_when_vocabulary_result_is_missing() -> None:
+def test_plan_always_schedules_learning_instead_of_ability_assessment() -> None:
     result = build_week_plan(profile(minutes=120))
-    assert any(task.task_type == TaskType.vocabulary_assessment for task in result.tasks)
+    assert any(task.task_type == TaskType.vocabulary_review for task in result.tasks)
+    assert not any(task.task_type == TaskType.vocabulary_assessment for task in result.tasks)

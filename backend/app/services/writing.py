@@ -18,6 +18,7 @@ from app.schemas import (
     WritingAssessment,
     WritingSubmission,
 )
+from app.services.coach_prompts import COACH_VOICE
 from app.services.rag import retrieve_official_rubric
 
 
@@ -68,6 +69,15 @@ def normalize_assessment(
         CriterionName.lexical_resource: citations[2],
         CriterionName.grammar_accuracy: citations[3],
     }
+    criterion_sources = {
+        CriterionName.task_achievement: "ielts-writing-task-response",
+        CriterionName.coherence_cohesion: "ielts-writing-coherence",
+        CriterionName.lexical_resource: "ielts-writing-lexical",
+        CriterionName.grammar_accuracy: "ielts-writing-grammar",
+    }
+    by_id = {citation.source_id: citation for citation in citations}
+    citation_by_criterion = {criterion: by_id.get(criterion_sources[criterion], citation)
+                             for criterion, citation in citation_by_criterion.items()}
     normalized_criteria = []
     for criterion in assessment.criteria:
         evidence = []
@@ -134,7 +144,6 @@ class _ModelWritingAssessment(BaseModel):
     top_priorities: list[str] = Field(min_length=1, max_length=3)
     rewrite_example: str
     next_exercise: str
-    disclaimer: str
 
 
 class WritingGrader(ABC):
@@ -226,7 +235,7 @@ class OpenAIWritingGrader(WritingGrader):
         citations = retrieve_official_rubric("writing task response coherence lexical grammar")
         schema = portable_json_schema(_ModelWritingAssessment.model_json_schema())
         prompt = (
-            "You are an IELTS Academic writing feedback assistant, not an official examiner. "
+            "You are an IELTS Academic writing tutor. Give direct, practical learning feedback. "
             "Assess the essay against the supplied rubric summaries. Every criterion must quote "
             "an exact span from the essay and cite at least one supplied source. Return Chinese feedback.\n\n"
             f"Task type: {submission.task_type.value}\nPrompt: {submission.prompt}\nEssay:\n{submission.essay}\n\n"
@@ -234,7 +243,7 @@ class OpenAIWritingGrader(WritingGrader):
         )
         response = await self.client.responses.create(
             model=self.model,
-            instructions="Return only schema-valid data. Do not claim the result is an official IELTS score.",
+            instructions="Return only schema-valid data. " + COACH_VOICE,
             input=prompt,
             text={
                 "format": {

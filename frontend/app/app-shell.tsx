@@ -19,15 +19,16 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 
 import { useAuth } from "./providers";
+import { TutorProvider } from "./floating-tutor";
 
 const links = [
   { href: "/", label: "学习概览", icon: Gauge },
   { href: "/profile", label: "学习档案", icon: UserRound },
   { href: "/plan", label: "本周计划", icon: CalendarDays },
-  { href: "/vocabulary", label: "词汇测评", icon: BookOpenCheck },
+  { href: "/vocabulary", label: "背单词", icon: BookOpenCheck },
   { href: "/question-bank", label: "练习题库", icon: LibraryBig },
-  { href: "/resources", label: "学习资料", icon: FolderOpen },
-  { href: "/writing", label: "写作反馈", icon: FilePenLine },
+  { href: "/resources", label: "个人知识库", icon: FolderOpen },
+  { href: "/writing", label: "写作工作台", icon: FilePenLine },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
@@ -44,7 +45,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const signOut = () => { logout(); router.replace("/login"); };
 
   return (
-    <div className="app-shell">
+    <TutorProvider><div className="app-shell">
       <aside className={`sidebar ${open ? "open" : ""}`}>
         <div className="brand-lockup">
           <span className="brand-mark">IA</span>
@@ -71,7 +72,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
           <div className="sidebar-footer">
             <span className={`connection-dot ${error ? "error" : ""}`} />
-            {loading ? "正在验证登录状态" : error ? "后端连接失败" : "学习数据已同步"}
+            {loading ? "连接中…" : error ? "连接失败" : "已同步"}
           </div>
         </div>
       </aside>
@@ -84,19 +85,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
         {children}
       </div>
-    </div>
+    </div></TutorProvider>
   );
 }
 
 export function PageHeader({ eyebrow, title, description, action }: {
-  eyebrow: string;
+  eyebrow?: string;
   title: string;
-  description: string;
+  description?: string;
   action?: React.ReactNode;
 }) {
   return (
     <header className="page-header">
-      <div><p className="eyebrow">{eyebrow}</p><h1>{title}</h1><p>{description}</p></div>
+      <div>{eyebrow && <p className="eyebrow">{eyebrow}</p>}<h1>{title}</h1>{description && <p>{description}</p>}</div>
       {action && <div className="page-action">{action}</div>}
     </header>
   );

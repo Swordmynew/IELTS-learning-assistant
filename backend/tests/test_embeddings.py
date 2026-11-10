@@ -1,3 +1,4 @@
+import json
 from pathlib import Path
 
 import pytest
@@ -36,3 +37,15 @@ async def test_fastembed_provider_uses_local_model(monkeypatch: pytest.MonkeyPat
 def test_dimension_mismatch_is_rejected() -> None:
     with pytest.raises(ValueError, match="database requires 384"):
         embeddings._validate_dimensions([0.0] * 10, "wrong-model")
+
+
+def test_native_model_vector_can_be_persisted_as_json(monkeypatch: pytest.MonkeyPatch) -> None:
+    import numpy as np
+
+    class Model:
+        def embed(self, texts):
+            yield np.full(embeddings.VECTOR_DIMENSIONS, 0.25, dtype=np.float32)
+
+    monkeypatch.setattr(embeddings, "_load_fastembed_model", lambda *args: Model())
+    vector = embeddings._fastembed_vector("however", "synthetic-local-model", Path("test-cache"))
+    assert json.loads(json.dumps(vector)) == [0.25] * embeddings.VECTOR_DIMENSIONS

@@ -27,6 +27,12 @@ class Settings(BaseSettings):
     openai_max_output_tokens: int = Field(default=2500, ge=256, le=16000)
     model_timeout_seconds: float = Field(default=60, ge=5, le=300)
     llm_provider: str = "openai"
+    coach_api_key: str | None = None
+    coach_base_url: str = "https://api.deepseek.com"
+    coach_model: str = "deepseek-chat"
+    coach_offline: bool = False
+    vocabulary_worker_enabled: bool = True
+    coach_max_output_tokens: int = Field(default=6000, ge=512, le=16000)
     embedding_provider: str = "auto"
     embedding_api_key: str | None = None
     embedding_base_url: str | None = None

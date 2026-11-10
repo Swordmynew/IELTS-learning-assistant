@@ -3,7 +3,17 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from uuid import uuid4
 
-from sqlalchemy import JSON, Boolean, DateTime, ForeignKey, Integer, String, Text, text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    text,
+)
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, relationship
 
@@ -185,8 +195,25 @@ class AgentRunRow(Base):
     finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
+class CoachRecord(Base):
+    """Versioned coach entities; payloads are validated at the service boundary."""
+
+    __tablename__ = "coach_records"
+    __table_args__ = (UniqueConstraint("user_id", "kind", "source_key", name="uq_coach_source"),)
+    id: Mapped[str] = mapped_column(String(36), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(32), index=True)
+    parent_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    source_key: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    payload: Mapped[dict] = mapped_column(JSON, default=dict)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utc_now)
+
+
 settings = get_settings()
-engine = create_async_engine(settings.database_url, pool_pre_ping=True)
+engine = create_async_engine(
+    settings.database_url, pool_pre_ping=True,
+    connect_args={"timeout": 30} if settings.database_url.startswith("sqlite") else {},
+)
 SessionLocal = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 
@@ -196,6 +223,10 @@ async def get_session():
 
 
 async def create_schema() -> None:
+    if engine.dialect.name == "sqlite":
+        async with engine.connect() as connection:
+            await connection.execute(text("PRAGMA journal_mode=WAL"))
+            await connection.commit()
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
         if connection.dialect.name == "postgresql":

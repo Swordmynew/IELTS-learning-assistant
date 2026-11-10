@@ -48,7 +48,6 @@ export interface WritingAssessment {
   top_priorities: string[];
   rewrite_example: string;
   next_exercise: string;
-  disclaimer: string;
   model_used: string;
 }
 
@@ -62,7 +61,6 @@ export interface VocabularyEstimate {
   none_of_above_accuracy: number;
   study_focus: string;
   calibration_status: string;
-  disclaimer: string;
 }
 
 export interface VocabularyTest {
@@ -258,12 +256,13 @@ export const api = {
       body: form,
     }, token);
   },
-  listQuestions: (token: string, module?: Skill, search?: string, incorrectOnly = false, taskType?: string) => {
+  listQuestions: (token: string, module?: Skill, search?: string, incorrectOnly = false, taskType?: string, questionId?: string) => {
     const params = new URLSearchParams();
     if (module) params.set("module", module);
     if (search) params.set("search", search);
     if (incorrectOnly) params.set("incorrect_only", "true");
     if (taskType) params.set("task_type", taskType);
+    if (questionId) params.set("question_id", questionId);
     const suffix = params.size ? `?${params}` : "";
     return request<PracticeQuestionPage>(`/question-bank/questions${suffix}`, {}, token);
   },

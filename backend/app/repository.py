@@ -158,6 +158,10 @@ async def save_assessment(
     submission: WritingSubmission,
     assessment: WritingAssessment,
 ) -> None:
+    from app.services.personal_knowledge import put_knowledge
+    await put_knowledge(session, user_id, f"assessment:{assessment.id}", "写作反馈",
+                        "\n".join(assessment.top_priorities), "writing", "writing",
+                        f"/writing?assessment={assessment.id}", event_id=str(assessment.id))
     session.add(
         WritingAssessmentRow(
             id=str(assessment.id),

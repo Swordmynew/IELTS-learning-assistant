@@ -2,7 +2,30 @@
 
 ## Context and boundaries
 
-The MVP optimizes for an interviewable AI/backend system rather than a full IELTS question bank. Writing and adaptive planning are deep paths; Listening, Reading and Speaking are represented in the learner model and schedule only.
+Writing and adaptive planning are the deepest paths. The current course build also supports objective question practice and personal knowledge accumulated across subjects. Task 2 supports immutable draft versions, structured issues, progressive hints and revision comparison; Task 1 retains the original single-assessment path.
+
+## Personal learning RAG and revision coaching
+
+```mermaid
+flowchart LR
+  Practice[Words / question attempts / writing issues] --> Facts[Original learning records]
+  Facts --> Notes[Editable personal knowledge]
+  Documents[Public guidance / private notes] --> Retrieve[User-filtered vector + keyword RRF]
+  Notes --> Retrieve
+  Retrieve --> LLM[DeepSeek Chat Completions]
+  Draft[Essay and previous version] --> LLM
+  LLM --> Validate[JSON / source IDs / exact quotations]
+  Validate --> Feedback[Cited answer / issue cards / comparison]
+  Validate --> Cache[Private exact-context cache]
+  Cache --> Replay[Failure: labelled historical replay]
+  Demo[Fixed synthetic examples] --> Separate[Independent offline demo]
+```
+
+`coach_records` stores typed payloads for personal knowledge, practices, immutable essay versions, conversations and validated caches. Its indexed user/kind/parent fields and unique user/kind/source key support scoped queries and idempotent backfill. Original practice rows remain the source of truth; knowledge vectors can be regenerated. Merge tombstones redirect later learning events into the surviving entry without resurrecting deleted cards.
+
+The shared generation adapter uses `COACH_*` configuration independently of the legacy Responses adapter. It never silently substitutes a heuristic estimate for a failed live request. An exact-context cache includes the user's knowledge revision and model/prompt/schema configuration. Cache misses preserve submitted work and expose a separate fixed demo. Cache and demo modes are visible in the UI.
+
+Personal records carry source links, category, subject, timestamps and concise provenance. They inform cross-subject learning advice but cannot replace public writing-rubric authority. The model sees full retrieved chunks; citation cards show excerpts and source links. Portable vector/keyword ranking is used on SQLite and PostgreSQL for this course-sized corpus; older PostgreSQL FTS helpers are retained but are not used by the new path. Model changes require re-embedding both document and personal vectors.
 
 The vocabulary diagnostic is a separate measurement path. It does not convert an uncalibrated vocabulary result directly into an IELTS band, because that relationship has not yet been established with validation data.
 
@@ -27,7 +50,7 @@ stateDiagram-v2
   Approved --> Superseded: a new draft is approved
 ```
 
-The language model may explain priorities and select task templates, but it does not own calendar invariants. CP-SAT owns daily capacity, required weekly sessions and high-load limits. `validate_plan` is run after every solver result, including the deterministic fallback.
+The current planning graph uses deterministic diagnosis and task templates rather than a language-model planning call. CP-SAT owns daily capacity, required weekly sessions and high-load limits. `validate_plan` is run after every solver result, including the deterministic fallback.
 
 The database transition from `draft` to `approved` is the human-in-the-loop boundary. It is intentionally outside the model turn: approval can be audited, retried with an idempotency key, and cannot be fabricated by generated text.
 
@@ -56,27 +79,32 @@ The model adapter receives the essay, prompt and retrieved rubric summaries, the
 - half-band values in `[0, 9]`;
 - overall score equals the rounded criterion mean;
 - every criterion contains an exact essay span and at least one citation;
-- a visible unofficial-score disclaimer.
+- direct feedback with cited evidence and concrete revision advice.
 
 No API key invokes `DeterministicWritingGrader`. Its low confidence and model name make it impossible for the UI to silently present heuristic output as a model or examiner result.
 
 For OpenAI-compatible providers, Pydantic schemas are normalized to a portable strict subset. Model output is never trusted for deterministic facts: the API recalculates the overall band from criterion bands, resolves evidence offsets against the submitted essay, and replaces generated citation payloads with retrieved source records. Provider timeout, retry count, reasoning effort and output-token limits are configuration values.
 
-## Adaptive vocabulary diagnostic
+## Vocabulary learning
 
 ```mermaid
 flowchart LR
-  Start[Start session] --> Pick[Maximize item information]
-  Pick --> Judge[Word / nonword decision]
-  Judge --> EAP[Update theta and posterior SE]
-  EAP --> Stop{15+ items and SE <= .45\nor 20 items?}
-  Stop -->|No| Pick
-  Stop -->|Yes| Result[Experimental estimate]
+  Dictionary[Bundled ECDICT starter words] --> Deck[Private word progress]
+  Grade[Essay grading] --> Feedback[Existing feedback response]
+  Grade --> Queue[Independent persisted vocabulary job]
+  Request[Learner requests vocabulary] --> Queue
+  Queue --> Extract[Separate vocabulary model call]
+  Extract -->|Eligible words| Deck
+  Extract -->|No eligible words| Empty[Empty list]
+  Deck --> Review[Recall then reveal]
+  Review --> Schedule[Again / hard / good intervals]
+  Schedule --> Deck
+  Deck --> RAG[Personal vocabulary knowledge]
 ```
 
-The item response curve uses a fixed lower asymptote of `0.5` for a binary decision and item-specific difficulty/discrimination priors. Ability is updated by expected a posteriori estimation on `[-4, 4]` with a standard normal prior. A session-specific content schedule keeps roughly one third nonwords, while item selection maximizes Fisher information within the scheduled class.
+The starter dictionary contains 8,520 selected English headwords and Chinese meanings from a pinned ECDICT snapshot. `npm run setup:vocabulary` prepares the local JSON as an ignored environment resource before startup; CI and Docker builds prepare the same resource. Normal study reads it without a remote dictionary or an LLM. IELTS-tagged words beyond the most frequent function words are offered first. Private `word_card` records overlay the starter data, preserving personal meanings, notes, review revisions and original writing sources. New phrases can extend a learner's deck without changing the shared starter file. Historical real-word mistakes import lazily; pseudowords are excluded.
 
-The checked-in bank is project-authored. Its item parameters and word-family mapping are prototypes, not psychometrically calibrated measurements. Production validation requires a larger bank, real response data, item-fit checks, reliability, differential item functioning analysis and comparison with an external validated measure.
+Writing routes enqueue a `vocabulary_job` after persisting their normal result. An in-process asynchronous worker uses a separate DB session and structured model request (`vocabulary_extract` or `vocabulary_suggest`); grading does not await that model call. Jobs persist across restarts, claim work with a conditional update, and recover expired leases. Shutdown requeues an interrupted job. Valid empty arrays complete successfully; unavailable models produce no fabricated words. Exact essay quotations are checked before any insertion. Normalized word keys merge sources while revision checks and review event IDs protect learning progress. Personal vocabulary is also indexed for RAG. Review scheduling is described in [VOCABULARY_LEARNING.md](VOCABULARY_LEARNING.md). Original diagnostic records and endpoints remain for historical compatibility, while the new UI and planner use learning/review data.
 
 ## Reliability and security
 

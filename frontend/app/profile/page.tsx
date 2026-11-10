@@ -43,7 +43,7 @@ function ProfileContent() {
     },
     onSuccess: (profile) => {
       setDraft(toDraft(profile));
-      setMessage({ type: "success", text: "已保存。下一次生成计划时会使用这些分数和学习时间。" });
+      setMessage({ type: "success", text: "已保存" });
       client.invalidateQueries({ queryKey: ["dashboard"] });
     },
     onError: (error: Error) => setMessage({ type: "error", text: `保存失败：${error.message}` }),
@@ -56,11 +56,11 @@ function ProfileContent() {
   const totalMinutes = Object.values(draft.minutes_by_weekday).reduce((sum, value) => sum + (Number(value) || 0), 0);
 
   return <main className="page">
-    <PageHeader eyebrow="学习档案" title="告诉我们你的起点与目标" description="分数和可用时间会直接影响每周任务的优先级、数量和安排日期。" action={<Link className="secondary-button" href="/plan">查看本周计划 <ArrowRight size={16} /></Link>} />
+    <PageHeader title="学习档案" action={<Link className="secondary-button" href="/plan">查看本周计划 <ArrowRight size={16} /></Link>} />
     {message && <div className={`notice ${message.type}`} role="status">{message.type === "success" && <Check size={18} />}{message.text}</div>}
     <div className="profile-layout">
       <section className="panel profile-form">
-        <div className="form-section-heading"><Target /><div><h2>考试目标</h2><p>请选择最近一次可参考的成绩；没有正式成绩时可以填写自测结果。</p></div></div>
+        <div className="form-section-heading"><Target /><div><h2>考试目标</h2><small>最近成绩或自测</small></div></div>
         <label className="field compact-field">计划考试日期<input type="date" value={draft.exam_date} onChange={(event) => setDraft({ ...draft, exam_date: event.target.value })} /></label>
         <div className="score-table">
           <div className="score-row heading"><span>科目</span><span>当前分数</span><span>目标分数</span><span>差距</span></div>
@@ -73,13 +73,13 @@ function ProfileContent() {
         </div>
       </section>
       <section className="panel profile-form">
-        <div className="form-section-heading"><Clock3 /><div><h2>每天可学习时间</h2><p>可以先清空再输入；留空在保存时按 0 分钟处理。</p></div></div>
+        <div className="form-section-heading"><Clock3 /><div><h2>每天可学习时间</h2></div></div>
         <div className="minutes-grid">{weekdayLabels.map((label, index) => {
           const day = String(index + 1);
-          return <label key={day}>{label}<div><input type="number" min="0" max="360" inputMode="numeric" value={draft.minutes_by_weekday[day] ?? ""} onChange={(event) => setDraft({ ...draft, minutes_by_weekday: { ...draft.minutes_by_weekday, [day]: event.target.value } })} /><span>分钟</span></div></label>;
+          return <label key={day}>{label}<div><input type="number" min="0" max="360" inputMode="numeric" placeholder="0" value={draft.minutes_by_weekday[day] ?? ""} onChange={(event) => setDraft({ ...draft, minutes_by_weekday: { ...draft.minutes_by_weekday, [day]: event.target.value } })} /><span>分钟</span></div></label>;
         })}</div>
         <div className="weekly-total"><span>每周可用时间</span><strong>{Math.floor(totalMinutes / 60)} 小时 {totalMinutes % 60} 分钟</strong></div>
-        <fieldset className="preference-field"><legend>希望优先加强（可多选）</legend><div>{skills.map((skill) => {
+        <fieldset className="preference-field"><legend>优先加强 · 多选</legend><div>{skills.map((skill) => {
           const checked = draft.preferred_skills.includes(skill);
           return <label className={checked ? "selected" : ""} key={skill}><input type="checkbox" checked={checked} onChange={() => setDraft({ ...draft, preferred_skills: checked ? draft.preferred_skills.filter((item) => item !== skill) : [...draft.preferred_skills, skill] })} />{skillLabels[skill]}</label>;
         })}</div></fieldset>

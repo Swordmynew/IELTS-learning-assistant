@@ -9,6 +9,35 @@ from app.services.rag import OFFICIAL_RUBRIC_SUMMARIES
 
 OFFICIAL_DOCUMENT_ID = "official-ielts-writing-rubric"
 
+LEARNING_NOTES = (
+    ("coach-argument", "Task 2 · 论证展开", "观点需要相关理由与具体支持。先说清楚谁受益、如何受益，再给出具体例子，最后说明例子怎样支持立场。"
+     "An argument links a clear claim to reasons and specific support. For example, targeted grants allow low-income students to gain qualifications."),
+    ("coach-connectors", "跨科目 · 连接关系", "阅读、听力和写作都要区分转折、因果、补充和例证。However 表示转折，therefore 表示结果，for example 引出例子。"
+     "However signals contrast; therefore introduces a consequence; for example introduces an illustration. "
+     "不要仅为增加连接词而添加 however。先检查两句话真实的逻辑关系。"),
+)
+
+
+async def seed_learning_guidance() -> None:
+    async with SessionLocal() as session:
+        for note_id, title, content in LEARNING_NOTES:
+            document = await session.get(KnowledgeDocumentRow, note_id)
+            if not document:
+                session.add(KnowledgeDocumentRow(id=note_id, title=title, filename=f"{note_id}.md",
+                    owner_id=None, license_type="project-authored", status="completed"))
+                await session.flush()
+            chunk = await session.get(KnowledgeChunkRow, f"{note_id}-chunk")
+            if chunk and chunk.content == content and chunk.metadata_json.get("embedding_model") == get_settings().local_embedding_model:
+                continue
+            vector, model = await embed_text(content, get_settings())
+            if not chunk:
+                chunk = KnowledgeChunkRow(id=f"{note_id}-chunk", document_id=note_id, owner_id=None,
+                                          chunk_index=0, content=content)
+                session.add(chunk)
+            chunk.content, chunk.embedding = content, vector
+            chunk.metadata_json = {"embedding_model": model, "module": "writing", "task_type": "writing_task_2", "license": "project-authored"}
+        await session.commit()
+
 READING_PASSAGE = """Cooling the city
 
 As cities grow, dark roofs and paved surfaces absorb solar energy during the day and release it slowly at night. This process creates an urban heat island: built-up districts remain warmer than nearby rural areas. City governments have therefore begun testing ways to reduce street-level temperatures without relying solely on air conditioning.

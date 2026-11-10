@@ -1,0 +1,10 @@
+{
+  "name": "ielts-learning-assistant-setup",
+  "private": true,
+  "scripts": {
+    "setup:vocabulary": "node scripts/setup-vocabulary.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import "./workspace.css";
 import { AppShell } from "./app-shell";
 import { Providers } from "./providers";
 

@@ -36,19 +36,12 @@ TEMPLATES: tuple[TaskTemplate, ...] = (
     TaskTemplate(TaskType.speaking_reflection, Skill.speaking, "口语话题复盘", "录制两分钟回答并自查流利度与词汇重复", 20),
 )
 
-VOCABULARY_ASSESSMENT = TaskTemplate(
-    TaskType.vocabulary_assessment,
-    "vocabulary",
-    "完成词汇能力测评",
-    "完成自适应词义选择测评，让后续计划使用词汇能力数据",
-    15,
-)
 VOCABULARY_REVIEW = TaskTemplate(
     TaskType.vocabulary_review,
     "vocabulary",
-    "词汇语境与词义巩固",
-    "根据测评层级复习高频词义、同义替换和常用搭配",
-    25,
+    "词汇复习与作文积累",
+    "复习到期词卡，巩固作文中的错词、搭配和实用表达",
+    15,
 )
 
 
@@ -87,7 +80,7 @@ def _skill_estimates(profile: LearnerProfileCreate, estimates: list[SkillEstimat
 def _candidates(
     profile: LearnerProfileCreate,
     estimates: list[SkillEstimate],
-    vocabulary: VocabularyEstimate | None,
+    vocabulary_learning: dict | None,
 ) -> list[tuple[TaskTemplate, float]]:
     by_skill = _skill_estimates(profile, estimates)
     candidates: list[tuple[TaskTemplate, float]] = []
@@ -103,20 +96,11 @@ def _candidates(
         candidates.append((template, score))
         if template.task_type in {TaskType.review, TaskType.reading_drill, TaskType.listening_drill}:
             candidates.append((template, max(0.05, round(score * 0.9, 4))))
-    if vocabulary is None:
-        candidates.append((VOCABULARY_ASSESSMENT, 0.62))
-    else:
-        average_target_band = sum(profile.target_scores.values()) / len(profile.target_scores)
-        target_theta = max(-0.4, min(1.4, -0.4 + 0.6 * (average_target_band - 5.0)))
-        vocabulary_score = round(
-            0.55 * _clamp((target_theta - vocabulary.theta) / 3.0)
-            + 0.35 * (1.0 - vocabulary.meaning_accuracy)
-            + 0.10 * _clamp(vocabulary.standard_error),
-            4,
-        )
-        candidates.append((VOCABULARY_REVIEW, max(0.12, vocabulary_score)))
-        if vocabulary.cefr_reference in {"A1", "A2", "B1", "B2"}:
-            candidates.append((VOCABULARY_REVIEW, max(0.1, round(vocabulary_score * 0.9, 4))))
+    learning = vocabulary_learning or {}
+    score = round(0.35 + min(0.35, learning.get("due", 0) / 100) + min(0.15, learning.get("personal", 0) / 1000), 4)
+    candidates.append((VOCABULARY_REVIEW, score))
+    if learning.get("due", 0):
+        candidates.append((VOCABULARY_REVIEW, round(score * 0.9, 4)))
     return candidates
 
 
@@ -253,9 +237,10 @@ def build_week_plan(
     estimates: list[SkillEstimate] | None = None,
     vocabulary: VocabularyEstimate | None = None,
     start: date | None = None,
+    vocabulary_learning: dict | None = None,
 ) -> StudyPlan:
     start = start or date.today()
-    candidates = _candidates(profile, estimates or [], vocabulary)
+    candidates = _candidates(profile, estimates or [], vocabulary_learning)
     try:
         tasks, conflicts = _cp_sat_schedule(profile, candidates, start)
     except ImportError:
@@ -276,11 +261,7 @@ def build_week_plan(
         "vocabulary": "词汇",
     }
     focus = "、".join(skill_labels[label] for label, _ in strongest)
-    vocabulary_note = (
-        f"词汇测评参考为 {vocabulary.cefr_reference}，已用于调整词汇任务频次。"
-        if vocabulary
-        else "尚无词汇测评结果，已优先安排一次词汇测评。"
-    )
+    vocabulary_note = f"词汇复习按到期词卡和个人积累安排，当前有 {(vocabulary_learning or {}).get('due', 0)} 个词待复习。"
     return StudyPlan(
         starts_on=start,
         ends_on=start + timedelta(days=6),

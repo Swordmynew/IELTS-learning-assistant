@@ -112,6 +112,12 @@ class Citation(BaseModel):
     page: int | None = None
     excerpt: str
     score: float = Field(default=1.0, ge=0, le=1)
+    source_type: str = "public"
+    provenance: str | None = None
+    license_type: str | None = None
+    source_link: str | None = None
+    recorded_at: str | None = None
+    number: int | None = None
 
 
 class EvidenceSpan(BaseModel):
@@ -161,7 +167,6 @@ class WritingAssessment(BaseModel):
     top_priorities: list[str] = Field(min_length=1, max_length=3)
     rewrite_example: str
     next_exercise: str
-    disclaimer: str = "AI 估分仅用于学习反馈，不代表 IELTS 官方成绩。"
     model_used: str
     created_at: datetime = Field(default_factory=utc_now)
 
@@ -188,10 +193,6 @@ class VocabularyEstimate(BaseModel):
     none_of_above_accuracy: float = Field(ge=0, le=1)
     study_focus: str
     calibration_status: str = "prototype_multiple_choice_parameters"
-    disclaimer: str = (
-        "实验性接受性词汇估计：CEFR 层级与词族区间不是官方换算，"
-        "题目参数仍需真实考生样本标定，不能替代标准化测试或 IELTS 成绩。"
-    )
 
 
 class VocabularyTest(BaseModel):
@@ -267,6 +268,9 @@ class RagQuery(BaseModel):
     module: Skill | None = None
     task_type: TaskType | None = None
     limit: int = Field(default=6, ge=1, le=10)
+    document_ids: list[str] = Field(default_factory=list, max_length=30)
+    source_type: Literal["all", "public", "document", "vocabulary", "mistake", "writing"] = "all"
+    conversation_id: str | None = None
 
 
 class RagAnswer(BaseModel):
@@ -274,6 +278,9 @@ class RagAnswer(BaseModel):
     answer: str
     citations: list[Citation]
     retrieval_mode: str
+    mode: str = "retrieval"
+    generated_at: str | None = None
+    conversation_id: str | None = None
 
 
 class KnowledgeDocumentSummary(BaseModel):

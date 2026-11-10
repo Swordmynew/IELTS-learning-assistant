@@ -32,7 +32,7 @@ function NewQuestionContent() {
   const create = useMutation({
     mutationFn: (payload: PracticeQuestionInput) => api.createQuestion(token!, payload),
     onSuccess: () => {
-      setMessage("题目已保存到你的私人题库。");
+      setMessage("已保存");
       setForm((current) => ({ ...current, prompt: "", correct_answer: "", explanation: "" }));
       client.invalidateQueries({ queryKey: ["practice-questions"] });
     },
@@ -56,22 +56,22 @@ function NewQuestionContent() {
   const setModule = (module: Skill) => setForm({ ...form, module, task_type: taskChoices[module][0].value, options: module === "reading" ? "True\nFalse\nNot Given" : "" });
 
   return <main className="page narrow-page">
-    <PageHeader eyebrow="录入练习题" title="用表单建立自己的题库" description="无需编写 JSON。相同套题可以复用材料和套题名称，逐题连续录入。" action={<Link className="secondary-button" href="/question-bank"><ArrowLeft size={16} />返回题库</Link>} />
+    <PageHeader title="录入练习题" action={<Link className="secondary-button" href="/question-bank"><ArrowLeft size={16} />返回题库</Link>} />
     {message && <div className={`notice ${create.isError ? "error" : "success"}`}>{!create.isError && <Check size={18} />}{message}</div>}
     <form className="panel question-form" onSubmit={submit}>
-      <section><span className="step-number">1</span><div><h2>题目归类</h2><p>先选择科目和题型，便于题库筛选。</p></div></section>
+      <section><span className="step-number">1</span><div><h2>题目归类</h2></div></section>
       <div className="form-grid two-columns"><label className="field">科目<select value={form.module} onChange={(event) => setModule(event.target.value as Skill)}>{skills.map((skill) => <option value={skill} key={skill}>{skillLabels[skill]}</option>)}</select></label><label className="field">题型<select value={form.task_type} onChange={(event) => setForm({ ...form, task_type: event.target.value })}>{taskChoices[form.module].map((choice) => <option value={choice.value} key={choice.value}>{choice.label}</option>)}</select></label></div>
-      <label className="field">套题名称<input required minLength={1} maxLength={500} value={form.source_name} onChange={(event) => setForm({ ...form, source_name: event.target.value })} placeholder="例如：剑桥练习册 12 Test 1（仅私人使用）" /><small>相同名称的题目会在题库页面归为一组。</small></label>
+      <label className="field">套题名称<input required minLength={1} maxLength={500} value={form.source_name} onChange={(event) => setForm({ ...form, source_name: event.target.value })} placeholder="例如：我的阅读练习 · Test 1" /><small>同名归为一组</small></label>
 
-      <section><span className="step-number">2</span><div><h2>材料与题目</h2><p>阅读填写文章；听力可填写你有权使用的录音文字稿；写作和口语可留空。</p></div></section>
-      <label className="field">共用材料（可选）<textarea className="material-input" value={form.passage} onChange={(event) => setForm({ ...form, passage: event.target.value })} placeholder="粘贴阅读文章或听力文字稿…" /></label>
-      <label className="field">题目<span className="required">必填</span><textarea required minLength={5} value={form.prompt} onChange={(event) => setForm({ ...form, prompt: event.target.value })} placeholder="输入题干，并保留 NO MORE THAN TWO WORDS 等作答要求…" /></label>
+      <section><span className="step-number">2</span><div><h2>材料与题目</h2></div></section>
+      <label className="field">阅读文章 / 听力原文（可选）<textarea className="material-input" value={form.passage} onChange={(event) => setForm({ ...form, passage: event.target.value })} placeholder="粘贴阅读文章或听力文字稿…" /></label>
+      <label className="field">题目<span className="required">必填</span><textarea required minLength={5} value={form.prompt} onChange={(event) => setForm({ ...form, prompt: event.target.value })} placeholder="题干及字数限制等作答要求…" /></label>
       <label className="field">选项（可选，每行一个）<textarea className="short-textarea" value={form.options} onChange={(event) => setForm({ ...form, options: event.target.value })} placeholder={'选项 A\n选项 B\n选项 C'} /></label>
 
-      <section><span className="step-number">3</span><div><h2>答案与解析</h2><p>答案可以暂不填写；写作与口语题通常只需填写练习建议。</p></div></section>
-      <div className="form-grid two-columns"><label className="field">参考答案<input value={form.correct_answer} onChange={(event) => setForm({ ...form, correct_answer: event.target.value })} placeholder="例如：public-health" /></label><label className="field">标签<input value={form.tags} onChange={(event) => setForm({ ...form, tags: event.target.value })} placeholder="定位, 同义替换（逗号分隔）" /></label></div>
-      <label className="field">答案解析<textarea className="short-textarea" value={form.explanation} onChange={(event) => setForm({ ...form, explanation: event.target.value })} placeholder="说明答案所在位置、干扰项或解题思路…" /></label>
-      <div className="form-footer"><p>请仅录入你合法持有并有权在本项目中使用的内容。私人题目不会向其他账号展示。</p><button className="primary-button" type="submit" disabled={create.isPending || form.prompt.trim().length < 5 || !form.source_name.trim()}>{create.isPending ? <Save /> : <Plus />}{create.isPending ? "正在保存…" : "保存并继续录入"}</button></div>
+      <section><span className="step-number">3</span><div><h2>答案与解析</h2></div></section>
+      <div className="form-grid two-columns"><label className="field">参考答案（可选）<input value={form.correct_answer} onChange={(event) => setForm({ ...form, correct_answer: event.target.value })} placeholder="例如：public-health" /></label><label className="field">标签<input value={form.tags} onChange={(event) => setForm({ ...form, tags: event.target.value })} placeholder="定位, 同义替换（逗号分隔）" /></label></div>
+      <label className="field">答案解析（可选）<textarea className="short-textarea" value={form.explanation} onChange={(event) => setForm({ ...form, explanation: event.target.value })} placeholder="说明答案所在位置、干扰项或解题思路…" /></label>
+      <div className="form-footer"><button className="primary-button" type="submit" disabled={create.isPending || form.prompt.trim().length < 5 || !form.source_name.trim()}>{create.isPending ? <Save /> : <Plus />}{create.isPending ? "正在保存…" : "保存并继续录入"}</button></div>
     </form>
   </main>;
 }

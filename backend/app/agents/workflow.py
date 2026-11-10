@@ -16,6 +16,7 @@ class PlanningState(TypedDict, total=False):
     plan: dict[str, Any]
     validation_errors: list[str]
     vocabulary: dict[str, Any] | None
+    vocabulary_learning: dict[str, Any] | None
     trace: list[str]
 
 
@@ -53,12 +54,7 @@ def retrieve(state: PlanningState) -> PlanningState:
 def plan(state: PlanningState) -> PlanningState:
     profile = LearnerProfileCreate.model_validate(state["profile"])
     estimates = [SkillEstimate.model_validate(item) for item in state["estimates"]]
-    vocabulary = (
-        VocabularyEstimate.model_validate(state["vocabulary"])
-        if state.get("vocabulary")
-        else None
-    )
-    result = build_week_plan(profile, estimates, vocabulary)
+    result = build_week_plan(profile, estimates, vocabulary_learning=state.get("vocabulary_learning"))
     return {"plan": result.model_dump(mode="json"), "trace": _append_trace(state, "plan")}
 
 
@@ -92,12 +88,14 @@ def generate_plan_with_trace(
     profile: LearnerProfileCreate,
     estimates: list[SkillEstimate],
     vocabulary: VocabularyEstimate | None = None,
+    vocabulary_learning: dict | None = None,
 ) -> tuple[StudyPlan, list[str]]:
     state = planning_graph.invoke(
         {
             "profile": profile.model_dump(mode="json"),
             "estimates": [item.model_dump(mode="json") for item in estimates],
             "vocabulary": vocabulary.model_dump(mode="json") if vocabulary else None,
+            "vocabulary_learning": vocabulary_learning,
             "trace": [],
         }
     )

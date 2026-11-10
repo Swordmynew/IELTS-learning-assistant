@@ -80,5 +80,5 @@ def test_authenticated_user_can_finish_adaptive_vocabulary_test() -> None:
 
         plan = client.post("/api/v1/plans/generate", headers=headers)
         assert plan.status_code == 201
-        assert test["result"]["cefr_reference"] in plan.json()["rationale"]
+        assert "词汇复习" in plan.json()["rationale"]
         assert any(task["skill"] == "vocabulary" for task in plan.json()["tasks"])

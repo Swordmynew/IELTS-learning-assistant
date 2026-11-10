@@ -1,6 +1,6 @@
 "use client";
 
-import { ArrowRight, BookOpenCheck, Eye, EyeOff, Sparkles } from "lucide-react";
+import { ArrowRight, Eye, EyeOff } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
@@ -11,7 +11,7 @@ const startPages = { overview: "/", plan: "/plan", "question-bank": "/question-b
 
 function friendlyError(message: string) {
   if (message.includes("Invalid email or password")) return "邮箱或密码不正确，请重新输入。";
-  if (message.includes("Failed to fetch")) return "暂时无法连接后端，请确认 API 已启动。";
+  if (message.includes("Failed to fetch")) return "暂时无法连接，请稍后重试。";
   return message;
 }
 
@@ -49,22 +49,21 @@ export default function LoginPage() {
   return <main className="auth-page">
     <section className="auth-intro">
       <Link className="auth-brand" href="/"><span className="brand-mark">IA</span><span><strong>IELTS Coach</strong><small>自适应学习助手</small></span></Link>
-      <div><p className="eyebrow">PERSONALISED PREPARATION</p><h1>把每天的练习，变成看得见的进步。</h1><p>从四科目标和当前水平出发，生成一周计划；每次练习结果都会回到你的能力画像中。</p></div>
-      <ul><li><BookOpenCheck />四科档案与分项目标</li><li><Sparkles />动态计划、错题和写作反馈</li></ul>
+      <div><h1>每天练习，<br />看见进步。</h1><ol className="auth-path" aria-label="学习路径"><li><b>01</b>目标</li><li><b>02</b>练习</li><li><b>03</b>复习</li></ol></div>
     </section>
     <section className="auth-card">
-      <div><p className="eyebrow">欢迎回来</p><h2>登录学习空间</h2><p>继续你的学习计划和练习记录。</p></div>
+      <div><h2>登录</h2></div>
       <form onSubmit={submit}>
         <label>邮箱<input type="email" autoComplete="email" required value={email} onChange={(event) => setEmail(event.target.value)} placeholder="name@example.com" /></label>
         <PasswordField value={password} onChange={setPassword} autoComplete="current-password" />
-        <label className="remember-row"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />在这台设备上保持登录</label>
+        <label className="remember-row"><input type="checkbox" checked={remember} onChange={(event) => setRemember(event.target.checked)} />保持登录</label>
         {error && <p className="auth-error" role="alert">{error}</p>}
         <button className="auth-submit" disabled={pending !== null}>{pending === "login" ? "正在登录…" : <>登录<ArrowRight size={17} /></>}</button>
       </form>
       <div className="auth-divider"><span>或</span></div>
-      <button className="demo-entry" disabled={pending !== null} onClick={useDemo}>{pending === "demo" ? "正在准备演示数据…" : "先进入演示账号体验"}</button>
-      <p className="auth-switch">还没有账号？<Link href="/register">免费注册</Link></p>
-      <p className="auth-note">当前版本不提供邮箱找回密码；请妥善保存本地测试账号。</p>
+      <button className="demo-entry" disabled={pending !== null} onClick={useDemo}>{pending === "demo" ? "载入中…" : "体验演示"}</button>
+      <p className="auth-switch">还没有账号？<Link href="/register">注册</Link></p>
+      <details className="auth-help"><summary>登录帮助</summary><p>暂不支持找回密码，请妥善保存账号。</p></details>
     </section>
   </main>;
 }

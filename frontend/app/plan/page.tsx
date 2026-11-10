@@ -25,7 +25,7 @@ function PlanContent() {
     mutationFn: () => api.generatePlan(token!),
     onSuccess: (plan) => {
       setDraft(plan);
-      setMessage({ type: "success", text: `新的计划草案已生成：${plan.tasks.length} 项任务，共 ${plan.tasks.reduce((sum, task) => sum + task.duration_minutes, 0)} 分钟。确认后才会成为正式计划。` });
+      setMessage({ type: "success", text: "草案已生成" });
     },
     onError: (error: Error) => setMessage({ type: "error", text: `生成失败：${error.message}` }),
   });
@@ -33,7 +33,7 @@ function PlanContent() {
     mutationFn: () => api.approvePlan(token!, draft!.id),
     onSuccess: () => {
       setDraft(null);
-      setMessage({ type: "success", text: "计划已启用。现在可以从每天的任务卡进入练习并标记完成。" });
+      setMessage({ type: "success", text: "计划已启用" });
       client.invalidateQueries({ queryKey: ["dashboard"] });
     },
     onError: (error: Error) => setMessage({ type: "error", text: `确认失败：${error.message}` }),
@@ -44,7 +44,7 @@ function PlanContent() {
     onSuccess: (task) => {
       setMessage({
         type: "success",
-        text: task.completed ? "任务已标记完成；如果是误触，可以在任务卡上点击“恢复任务”。" : "任务已恢复为待完成，完成率已同步更新。",
+        text: task.completed ? "任务已完成" : "任务已恢复",
       });
       client.invalidateQueries({ queryKey: ["dashboard"] });
     },
@@ -67,15 +67,15 @@ function PlanContent() {
     : plan?.rationale;
 
   return <main className="page">
-    <PageHeader eyebrow="本周计划" title="一眼看清这一周怎么学" description="系统根据分数差距和每天可用时间安排任务。新计划先作为草案展示，由你确认后再启用。" action={<button className="primary-button" onClick={() => generate.mutate()} disabled={generate.isPending}>{generate.isPending ? <LoaderCircle className="spin" size={17} /> : <RefreshCw size={17} />}{plan ? "重新生成计划" : "生成本周计划"}</button>} />
+    <PageHeader title="本周计划" action={<button className="primary-button" onClick={() => generate.mutate()} disabled={generate.isPending}>{generate.isPending ? <LoaderCircle className="spin" size={17} /> : <RefreshCw size={17} />}{plan ? "重新生成计划" : "生成本周计划"}</button>} />
     {message && <div className={`notice ${message.type}`} role="status">{message.type === "error" ? <CircleAlert size={18} /> : <Check size={18} />}{message.text}</div>}
-    {!dashboard.data?.profile ? <div className="panel empty-state"><CalendarDays /><h2>先填写学习档案</h2><p>至少需要考试日期、四科当前分数、目标分数和每天可用时间。</p><Link className="primary-button" href="/profile">填写学习档案</Link></div> : !plan ? <div className="panel empty-state"><CalendarDays /><h2>还没有学习计划</h2><p>点击右上角“生成本周计划”，系统会先给你一份可以审核的草案。</p><button className="primary-button" onClick={() => generate.mutate()}>生成本周计划</button></div> : <>
+    {!dashboard.data?.profile ? <div className="panel empty-state"><CalendarDays /><h2>先填写学习档案</h2><Link className="primary-button" href="/profile">填写学习档案</Link></div> : !plan ? <div className="panel empty-state"><CalendarDays /><h2>还没有学习计划</h2></div> : <>
       <section className={`plan-summary ${draft ? "draft" : "active"}`}>
-        <div><span className="status-pill">{draft ? "待你确认的草案" : "正在执行"}</span><h2>{plan.starts_on} — {plan.ends_on}</h2><p>{rationale}</p></div>
+        <div><span className="status-pill">{draft ? "待确认" : "已启用"}</span><h2>{plan.starts_on} — {plan.ends_on}</h2><details className="plan-rationale"><summary>安排依据</summary><p>{rationale}</p></details></div>
         <div className="plan-stats"><div><strong>{plan.tasks.length}</strong><span>项任务</span></div><div><strong>{plan.tasks.reduce((sum, task) => sum + task.duration_minutes, 0)}</strong><span>分钟</span></div><div><strong>{completed}</strong><span>已完成</span></div></div>
-        {draft && <button className="approve-button" onClick={() => approve.mutate()} disabled={approve.isPending}>{approve.isPending ? <LoaderCircle className="spin" size={17} /> : <Check size={18} />}{approve.isPending ? "正在启用…" : "确认并启用这份计划"}</button>}
+        {draft && <button className="approve-button" onClick={() => approve.mutate()} disabled={approve.isPending}>{approve.isPending ? <LoaderCircle className="spin" size={17} /> : <Check size={18} />}{approve.isPending ? "正在启用…" : "启用计划"}</button>}
       </section>
-      {plan.conflicts.length > 0 && <div className="notice warning"><CircleAlert size={18} /><div><strong>安排时发现以下限制</strong>{plan.conflicts.map((conflict) => <p key={conflict}>{conflict}</p>)}</div></div>}
+      {plan.conflicts.length > 0 && <div className="notice warning"><CircleAlert size={18} /><div><strong>安排限制</strong>{plan.conflicts.map((conflict) => <p key={conflict}>{conflict}</p>)}</div></div>}
       <section className="week-grid">{dates.map((date) => {
         const tasks = plan.tasks.filter((task) => task.scheduled_date === date);
         const minutes = tasks.reduce((sum, task) => sum + task.duration_minutes, 0);
@@ -85,9 +85,9 @@ function PlanContent() {
           <header><div><strong>{formatDate(date)}</strong><span>{minutes} / {capacity} 分钟</span></div><div className="capacity-track"><span style={{ width: `${capacity ? Math.min(100, minutes / capacity * 100) : 0}%` }} /></div></header>
           <div className="day-tasks">{tasks.length ? tasks.map((task) => <div className={`plan-task ${task.completed ? "done" : ""}`} key={task.id}>
             <div className="task-top"><span className={`skill-tag ${task.skill}`}>{skillLabels[task.skill]}</span><span><Clock3 size={13} /> {task.duration_minutes} 分钟</span></div>
-            <h3>{task.title}</h3><p>{task.objective}</p>
+            <h3>{task.title}</h3><details className="task-objective"><summary>练习目标</summary><p>{task.objective}</p></details>
             <div className="task-actions"><Link href={skillRoutes[task.skill]}>{taskAction(task)} <ArrowRight size={14} /></Link>{!draft && <button className={task.completed ? "restore-task" : ""} onClick={() => updateCompletion.mutate({ taskId: task.id, completed: !task.completed })} disabled={updateCompletion.isPending && updateCompletion.variables?.taskId === task.id}>{task.completed && <Undo2 size={13} />}{updateCompletion.isPending && updateCompletion.variables?.taskId === task.id ? "更新中…" : task.completed ? "恢复任务" : "标记完成"}</button>}</div>
-          </div>) : <div className="rest-day">今天不安排任务<br /><small>留给休息或补做</small></div>}</div>
+          </div>) : <div className="rest-day">休息 / 补做</div>}</div>
         </article>;
       })}</section>
     </>}
