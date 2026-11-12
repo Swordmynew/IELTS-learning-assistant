@@ -5,7 +5,9 @@ from enum import StrEnum
 from typing import Annotated, Literal
 from uuid import UUID, uuid4
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
+
+from app.services.learning_time import learning_today
 
 BandScore = Annotated[float, Field(ge=0, le=9, multiple_of=0.5)]
 
@@ -43,7 +45,7 @@ class VocabularyTestStatus(StrEnum):
     completed = "completed"
 
 
-class LearnerProfileCreate(BaseModel):
+class LearnerProfileRead(BaseModel):
     exam_date: date
     current_scores: dict[Skill, BandScore]
     target_scores: dict[Skill, BandScore]
@@ -53,15 +55,21 @@ class LearnerProfileCreate(BaseModel):
     preferred_skills: list[Skill] = Field(default_factory=list)
 
     @model_validator(mode="after")
-    def validate_profile(self) -> LearnerProfileCreate:
-        if self.exam_date <= date.today():
-            raise ValueError("exam_date must be in the future")
+    def validate_profile(self) -> LearnerProfileRead:
         if set(self.current_scores) != set(Skill) or set(self.target_scores) != set(Skill):
             raise ValueError("scores must include listening, reading, writing and speaking")
         if not self.minutes_by_weekday or any(day not in range(1, 8) for day in self.minutes_by_weekday):
             raise ValueError("minutes_by_weekday keys must be ISO weekdays 1 through 7")
         if any(minutes < 0 or minutes > 360 for minutes in self.minutes_by_weekday.values()):
             raise ValueError("daily availability must be between 0 and 360 minutes")
+        return self
+
+
+class LearnerProfileCreate(LearnerProfileRead):
+    @model_validator(mode="after")
+    def validate_future_exam(self) -> LearnerProfileCreate:
+        if self.exam_date <= learning_today():
+            raise ValueError("exam_date must be in the future")
         return self
 
 
@@ -118,6 +126,11 @@ class Citation(BaseModel):
     source_link: str | None = None
     recorded_at: str | None = None
     number: int | None = None
+    topic_tags: list[str] = Field(default_factory=list)
+    match_reasons: list[str] = Field(default_factory=list)
+    memory_status: str | None = None
+    memory_state_source: str | None = None
+    context_truncated: bool = False
 
 
 class EvidenceSpan(BaseModel):
@@ -255,7 +268,8 @@ class TokenResponse(BaseModel):
 
 
 class DashboardSummary(BaseModel):
-    profile: LearnerProfileCreate | None
+    learning_today: date = Field(default_factory=learning_today)
+    profile: LearnerProfileRead | None
     active_plan: StudyPlan | None
     completed_tasks: int
     total_tasks: int
@@ -269,11 +283,22 @@ class RagQuery(BaseModel):
     task_type: TaskType | None = None
     limit: int = Field(default=6, ge=1, le=10)
     document_ids: list[str] = Field(default_factory=list, max_length=30)
-    source_type: Literal["all", "public", "document", "vocabulary", "mistake", "writing"] = "all"
+    source_type: Literal["all", "public", "document", "vocabulary", "mistake", "writing", "note"] = "all"
+    topic_tags: list[str] = Field(default_factory=list, max_length=20)
     conversation_id: str | None = None
+
+    @field_validator("topic_tags")
+    @classmethod
+    def normalize_topic_filter(cls, values):
+        if any(len(value) > 64 for value in values):
+            raise ValueError("Topic tags must be at most 64 characters")
+        from app.services.learning_memory import normalize_topics
+        return normalize_topics(values)
 
 
 class RagAnswer(BaseModel):
+    retrieval_query: str | None = None
+    evidence_chars: int = 0
     query: str
     answer: str
     citations: list[Citation]

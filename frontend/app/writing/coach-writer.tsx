@@ -8,6 +8,7 @@ import { DemoDialog, Sources, typeLabels } from "../coach-components";
 import { TutorScope } from "../floating-tutor";
 import { AnnotatedEssay, type Annotation } from "./annotated-essay";
 import { WritingWords } from "./writing-words";
+import { SaveNoteButton } from "../resources/knowledge-editor";
 
 const labels: Record<string, string> = { task_achievement: "任务回应", coherence_cohesion: "连贯与衔接", lexical_resource: "词汇资源", grammar_accuracy: "语法与准确性", improved: "已改善", partial: "部分改善", remaining: "仍存在" };
 
@@ -83,7 +84,7 @@ export function CoachWriter({ token }: { token: string }) {
     <div className="coach-writing-main">{demo && <DemoDialog token={token} onClose={() => setDemo(false)} />}
       <section className="panel coach-prompt"><small>题目</small>{sessionId ? <h2>{current.data?.prompt ?? "正在读取…"}</h2> : <textarea value={prompt} onChange={event => setPrompt(event.target.value)} maxLength={4000} placeholder="输入 Task 2 题目…" aria-label="Task 2 题目" />}</section>
       <div className="writer-workspace"><section className="panel writer-document">
-        <header className="writer-document-heading"><span>{composing ? "修改稿" : selected ? `稿件 V${versions.findIndex(v => v.id === selected.id) + 1}` : "初稿"}</span><small>{wordCount} words</small></header>
+        <header className="writer-document-heading"><span>{composing ? "修改稿" : selected ? `稿件 V${versions.findIndex(v => v.id === selected.id) + 1}` : "初稿"}</span><div className="memory-document-tools"><small>{wordCount} words</small>{selected && !composing && <SaveNoteButton key={selected.id} token={token} source={{ source_type: "writing_version", source_id: selected.id }} title={current.data?.prompt ?? "作文摘录"} text={selected.essay} />}</div></header>
         {selected && !composing && <AnnotatedEssay key={selected.id} text={selected.essay} annotations={annotations} activeId={activeNote} onSelect={selectNote} />}
         {selected && composing && <details className="writer-original"><summary>对照原稿</summary><p>{selected.essay}</p></details>}
         {(!selected || composing) && <textarea value={essay} onChange={event => setEssay(event.target.value)} className="writer-essay-input" aria-label="作文编辑区" maxLength={20000} placeholder={selected ? "修改你的作文…" : "开始写作…"} autoFocus={composing} />}

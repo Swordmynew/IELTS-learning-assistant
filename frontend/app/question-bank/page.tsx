@@ -9,6 +9,7 @@ import { PageHeader, SessionGate } from "../app-shell";
 import { useDemoSession } from "../providers";
 import { api, PracticeQuestionPreview, QuestionAttemptResult, Skill } from "@/lib/api";
 import { skillLabels, skills } from "@/lib/ui";
+import { SaveNoteButton } from "../resources/knowledge-editor";
 
 const taskLabels: Record<string, string> = {
   true_false_not_given: "判断题", multiple_choice: "单项选择", sentence_completion: "句子填空",
@@ -102,7 +103,7 @@ function QuestionBankContent() {
           const result = results[question.id];
           return <article className={`question-item ${result ? result.is_correct ? "correct" : "incorrect" : ""}`} key={question.id}>
           <div className="question-kind"><span>{taskLabels[question.task_type] ?? question.task_type.replaceAll("_", " ")}</span>{question.tags.slice(0, 3).map((tag) => <small key={tag}>{tag}</small>)}{question.last_attempt_correct === true && <small className="history-correct">上次答对</small>}{question.last_attempt_correct === false && <small className="history-wrong">待复习</small>}</div>
-          <h3>{question.prompt}</h3>
+          <h3>{question.prompt}</h3><SaveNoteButton token={token!} source={{ source_type: "question", source_id: question.id }} title={question.prompt} text={[question.prompt, question.passage].filter(Boolean).join("\n")} />
           {question.options.length > 0 ? <div className={`answer-options ${user?.preferences.compact_question_options ? "compact" : ""}`}>{question.options.map((option, index) => <label className={answers[question.id] === option ? "selected" : ""} key={option}><input type="radio" name={`question-${question.id}`} value={option} checked={answers[question.id] === option} onChange={(event) => setAnswers({ ...answers, [question.id]: event.target.value })} /><b>{String.fromCharCode(65 + index)}</b><span>{option}</span></label>)}</div> : question.has_answer ? <input className="short-answer-input" aria-label="输入答案" value={answers[question.id] ?? ""} onChange={(event) => setAnswers({ ...answers, [question.id]: event.target.value })} placeholder="输入答案" /> : null}
           {question.has_answer ? <button className="submit-answer" disabled={!answers[question.id]?.trim() || (submitAttempt.isPending && submitAttempt.variables?.questionId === question.id)} onClick={() => submitAttempt.mutate({ questionId: question.id, answer: answers[question.id] })}>{submitAttempt.isPending && submitAttempt.variables?.questionId === question.id ? "正在批改…" : result ? "再次提交" : "提交答案"}</button> : <div className="manual-feedback-note">{question.module === "writing" ? <Link className="text-link" href="/writing">写作批改 →</Link> : <span className="coach-chip">自主录音复盘</span>}</div>}
           {result && <div className={`answer-result ${result.is_correct ? "correct" : "incorrect"}`}>{result.is_correct ? <CheckCircle2 /> : <XCircle />}<div><strong>{result.is_correct ? "回答正确" : "这次还没有答对"}</strong><p><b>你的答案：</b>{result.submitted_answer}</p><p><b>参考答案：</b>{result.correct_answer}</p>{result.explanation && <p><b>解析：</b>{result.explanation}</p>}{result.profile_updated && <p className="profile-update-note">档案已更新</p>}{!result.is_correct && <button onClick={() => { setAnswers({ ...answers, [question.id]: "" }); setResults((current) => { const next = { ...current }; delete next[question.id]; return next; }); }}><RotateCcw />再做一次</button>}</div></div>}

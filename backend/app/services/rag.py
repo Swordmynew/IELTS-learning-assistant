@@ -44,15 +44,36 @@ def reciprocal_rank_fusion(
     ]
 
 
+def _terms(text: str) -> list[str]:
+    stopwords = {"the", "a", "an", "is", "are", "was", "were", "to", "of", "and", "or", "in", "on", "for", "with", "this", "that", "my", "me", "how", "what", "can", "does", "do", "i", "you"}
+    terms = [word for word in re.findall(r"[a-zA-Z]{2,}", text.lower()) if word not in stopwords]
+    for run in re.findall(r"[\u4e00-\u9fff]{2,}", text):
+        terms.extend(run[index:index + 2] for index in range(len(run) - 1))
+        if 2 < len(run) <= 8:
+            terms.append(run)
+    return terms
+
+
 def keyword_rank(query: str, chunks: list[SearchHit]) -> list[SearchHit]:
-    terms = set(re.findall(r"[a-zA-Z]{2,}|[\u4e00-\u9fff]", query.lower()))
-    scored: list[tuple[float, SearchHit]] = []
-    for chunk in chunks:
-        text = chunk.content.lower()
-        overlap = sum(text.count(term) for term in terms)
-        normalization = math.sqrt(max(1, len(text.split())))
-        scored.append((overlap / normalization, chunk))
-    return [item for score, item in sorted(scored, key=lambda pair: pair[0], reverse=True) if score > 0]
+    from collections import Counter
+
+    terms = set(_terms(query))
+    if not terms or not chunks:
+        return []
+    docs = [(chunk, Counter(_terms(chunk.content))) for chunk in chunks]
+    average = sum(sum(counts.values()) for _, counts in docs) / len(docs) or 1
+    frequency = {term: sum(term in counts for _, counts in docs) for term in terms}
+    scored = []
+    for chunk, counts in docs:
+        score = 0.0
+        for term in terms:
+            tf = counts[term]
+            if tf:
+                idf = math.log(1 + (len(docs) - frequency[term] + 0.5) / (frequency[term] + 0.5))
+                score += idf * tf * 2.2 / (tf + 1.2 * (0.25 + 0.75 * sum(counts.values()) / average))
+        if score:
+            scored.append((score, chunk))
+    return [chunk for _, chunk in sorted(scored, key=lambda item: item[0], reverse=True)]
 
 
 def to_citation(hit: SearchHit) -> Citation:

@@ -15,12 +15,21 @@ from app.coach_schemas import (
     TutorAnswer,
     VersionCreate,
 )
-from app.db import CoachRecord, LearnerProfileRow, User, WritingAssessmentRow, get_session
+from app.db import CoachRecord, User, WritingAssessmentRow, get_session
 from app.schemas import RagQuery
 from app.services.coach_model import generate
 from app.services.coach_prompts import TUTOR_GROUNDING
+from app.services.learning_memory import (
+    event_stats,
+    invalidate_memory,
+    memory_catalog,
+    record_event,
+    topics_for,
+    usable_history,
+)
 from app.services.personal_knowledge import backfill, index_payload, knowledge_view, put_knowledge
 from app.services.rag import retrieve_official_rubric
+from app.services.retrieval_context import bounded_history, pack_evidence, retrieval_question
 from app.services.search_repository import retrieve_sources
 from app.services.vocabulary_extraction import enqueue_safely
 from app.services.writing import normalize_assessment, validate_assessment
@@ -107,12 +116,8 @@ async def backfill_knowledge(
 async def list_knowledge(
     user: User = Depends(current_user), session: AsyncSession = Depends(get_session)
 ):
-    rows = await session.scalars(
-        select(CoachRecord)
-        .where(CoachRecord.user_id == user.id, CoachRecord.kind == "knowledge")
-        .order_by(CoachRecord.created_at.desc())
-    )
-    return [knowledge_view(row) for row in rows if not row.payload.get("deleted")]
+    rows, events = await memory_catalog(session, user.id)
+    return [{**knowledge_view(row), **event_stats(events.get(row.id, []))} for row in rows]
 
 
 @router.patch("/knowledge/items/{item_id}")
@@ -123,9 +128,22 @@ async def update_knowledge(
     session: AsyncSession = Depends(get_session),
 ):
     row = await owned(session, user.id, item_id, "knowledge")
-    data = {**row.payload, **body.model_dump(), "updated_at": datetime.now(UTC).isoformat()}
+    updates = body.model_dump(mode="json", exclude_unset=True)
+    if any(value is None for key, value in updates.items() if key != "source_url"):
+        raise HTTPException(422, "Only source_url may be cleared with null")
+    if ("content" in updates or "source_url" in updates) and row.payload.get("source_kind") != "manual":
+        raise HTTPException(409, "Original practice and bookmark snapshots are immutable; edit your note")
+    if "related_ids" in updates:
+        for related_id in updates["related_ids"]:
+            if related_id == item_id:
+                raise HTTPException(422, "A record cannot link to itself")
+            await owned(session, user.id, related_id, "knowledge")
+    if "topic_tags" in updates:
+        updates["topic_origin"] = "user"
+    data = {**row.payload, **updates, "updated_at": datetime.now(UTC).isoformat()}
     await index_payload(data)
     row.payload = data
+    await invalidate_memory(session, user.id, {row.id})
     await session.commit()
     return knowledge_view(row)
 
@@ -136,6 +154,7 @@ async def delete_knowledge(
 ):
     row = await owned(session, user.id, item_id, "knowledge")
     row.payload = {"deleted": True}
+    await invalidate_memory(session, user.id, {row.id})
     await session.commit()
 
 
@@ -158,6 +177,7 @@ async def merge_knowledge(
     merged = dict(data.get("merged_records", {}))
     for row in others:
         merged[row.source_key] = {
+            "item_id": row.id,
             "title": row.payload["title"],
             "content": row.payload["content"],
             "source_link": row.payload["source_link"],
@@ -167,12 +187,14 @@ async def merge_knowledge(
         }
         merged.update(row.payload.get("merged_records", {}))
     data["merged_records"] = merged
+    data["topic_tags"] = sorted(set(topics_for(target.payload)) | {tag for row in others for tag in topics_for(row.payload)})
     data["merged_sources"] = [*data.get("merged_sources", []), *[r.source_key for r in others]]
     data["updated_at"] = datetime.now(UTC).isoformat()
     await index_payload(data)
     target.payload = data
     for row in others:
         row.payload = {"deleted": True, "merged_into": target.id}
+    await invalidate_memory(session, user.id, {target.id, *[row.id for row in others]})
     await session.commit()
     return knowledge_view(target)
 
@@ -303,7 +325,14 @@ async def assess_version(
         "prompt": writing.payload["prompt"],
         "essay": essay,
         "public_rubric": [c.model_dump() for c in citations],
-        "personal_learning": [{"id": h.chunk_id, "content": h.content} for h in matched],
+        "personal_learning": [
+            {"id": h.chunk_id, "content": h.content,
+             "provenance": next(c.provenance for c in personal_citations if c.source_id == h.chunk_id),
+             "source_type": next(c.source_type for c in personal_citations if c.source_id == h.chunk_id),
+             "memory_status": next(c.memory_status for c in personal_citations if c.source_id == h.chunk_id),
+             "memory_state_source": next(c.memory_state_source for c in personal_citations if c.source_id == h.chunk_id)}
+            for h in matched
+        ],
         "previous": {
             "essay": previous.payload["essay"],
             "issues": previous.payload["feedback"]["data"]["issues"],
@@ -403,10 +432,11 @@ async def assess_version(
         )
     )
     if not writing.payload.get("profile_updated") and not prior:
-        from app.repository import get_profile
+        from app.repository import get_profile, lock_planning_user, save_profile
         from app.schemas import Skill, SkillEstimate
         from app.services.writing import round_band
 
+        await lock_planning_user(session, user.id)
         stored = await get_profile(session, user.id)
         if stored:
             profile, estimates = stored
@@ -422,15 +452,7 @@ async def assess_version(
                 confidence=0.6,
                 days_since_practice=0,
             )
-            profile_row = await session.scalar(
-                select(LearnerProfileRow).where(LearnerProfileRow.user_id == user.id)
-            )
-            profile_row.payload = profile.model_copy(update={"current_scores": scores}).model_dump(
-                mode="json"
-            )
-            profile_row.estimates = [
-                item.model_dump(mode="json") for item in estimates_by_skill.values()
-            ]
+            await save_profile(session, user.id, profile.model_copy(update={"current_scores": scores}), list(estimates_by_skill.values()))
             writing.payload = {**writing.payload, "profile_updated": True}
     for issue in result.data["issues"]:
         await put_knowledge(
@@ -457,8 +479,10 @@ async def assess_version(
                 old_note.payload = {
                     **old_note.payload,
                     "status": improvement["status"],
+                    "state_source": "writing_revision",
                     "updated_at": datetime.now(UTC).isoformat(),
                 }
+                await record_event(session, old_note, version.id, event_type="revision")
     await session.commit()
     await enqueue_safely(session, user.id, version.id)
     return view(version)
@@ -511,12 +535,13 @@ async def ask_writing(
             CoachRecord.parent_id == version.id,
         )
     )
-    history = conversation.payload.get("messages", []) if conversation else []
+    history = usable_history(conversation.payload.get("messages", [])) if conversation else []
     citations, hits, _ = await retrieve_sources(
         session,
         user.id,
-        RagQuery(query=" ".join([*[m["query"] for m in history[-2:]], body.query])[-2000:]),
+        RagQuery(query=(retrieval_question(body.query, history) + " " + version.payload["essay"])[:2000], module="writing"),
     )
+    citations, evidence = pack_evidence(citations, hits, body.query)
     allowed = {c.source_id for c in citations}
 
     def validate(value: TutorAnswer) -> TutorAnswer:
@@ -532,12 +557,9 @@ async def ask_writing(
             "question": body.query,
             "prompt": writing.payload["prompt"],
             "essay": version.payload["essay"],
-            "history": history[-6:],
+            "history": bounded_history(history),
             "feedback": version.payload.get("feedback"),
-            "sources": [
-                {**c.model_dump(), "full_text": hit.content}
-                for c, hit in zip(citations, hits, strict=True)
-            ],
+            "sources": evidence,
         },
         TutorAnswer,
         "Answer the student's question about this essay. " + TUTOR_GROUNDING,
@@ -560,6 +582,7 @@ async def ask_writing(
         *history,
         {
             "query": body.query,
+            "context_source_ids": [c.source_id for c in citations],
             "answer": answer,
             "citations": selected,
             "mode": result.mode,

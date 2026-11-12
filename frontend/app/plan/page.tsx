@@ -7,7 +7,7 @@ import { useMemo, useState } from "react";
 
 import { PageHeader, SessionGate } from "../app-shell";
 import { useDemoSession } from "../providers";
-import { api, StudyPlan } from "@/lib/api";
+import { api, generatePlanStream, StudyPlan } from "@/lib/api";
 import { formatDate, skillLabels, skillRoutes, taskAction } from "@/lib/ui";
 
 export default function PlanPage() {
@@ -21,13 +21,17 @@ function PlanContent() {
   const [draft, setDraft] = useState<StudyPlan | null>(null);
   const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
 
+  const [progress, setProgress] = useState("");
   const generate = useMutation({
-    mutationFn: () => api.generatePlan(token!),
+    onMutate: () => { setProgress("正在读取学习档案…"); setMessage(null); },
+    mutationFn: () => generatePlanStream(token!, event => { if (event.message) setProgress(event.message); }),
     onSuccess: (plan) => {
+      setProgress("");
       setDraft(plan);
       setMessage({ type: "success", text: "草案已生成" });
+      client.invalidateQueries({ queryKey: ["dashboard"] });
     },
-    onError: (error: Error) => setMessage({ type: "error", text: `生成失败：${error.message}` }),
+    onError: (error: Error) => { setProgress(""); setMessage({ type: "error", text: `生成失败：${error.message}` }); },
   });
   const approve = useMutation({
     mutationFn: () => api.approvePlan(token!, draft!.id),
@@ -54,10 +58,11 @@ function PlanContent() {
   const plan = draft ?? dashboard.data?.active_plan ?? null;
   const dates = useMemo(() => {
     if (!plan) return [];
-    const start = new Date(`${plan.starts_on}T12:00:00`);
-    return Array.from({ length: 7 }, (_, index) => {
+    const start = new Date(`${plan.starts_on}T00:00:00Z`);
+    const count = Math.min(7, Math.max(0, Math.round((Date.parse(`${plan.ends_on}T00:00:00Z`) - start.getTime()) / 86400000) + 1));
+    return Array.from({ length: count }, (_, index) => {
       const day = new Date(start);
-      day.setDate(start.getDate() + index);
+      day.setUTCDate(start.getUTCDate() + index);
       return day.toISOString().slice(0, 10);
     });
   }, [plan]);
@@ -68,18 +73,19 @@ function PlanContent() {
 
   return <main className="page">
     <PageHeader title="本周计划" action={<button className="primary-button" onClick={() => generate.mutate()} disabled={generate.isPending}>{generate.isPending ? <LoaderCircle className="spin" size={17} /> : <RefreshCw size={17} />}{plan ? "重新生成计划" : "生成本周计划"}</button>} />
+    {generate.isPending && <p className="profile-update-note" role="status">{progress}</p>}
     {message && <div className={`notice ${message.type}`} role="status">{message.type === "error" ? <CircleAlert size={18} /> : <Check size={18} />}{message.text}</div>}
     {!dashboard.data?.profile ? <div className="panel empty-state"><CalendarDays /><h2>先填写学习档案</h2><Link className="primary-button" href="/profile">填写学习档案</Link></div> : !plan ? <div className="panel empty-state"><CalendarDays /><h2>还没有学习计划</h2></div> : <>
       <section className={`plan-summary ${draft ? "draft" : "active"}`}>
         <div><span className="status-pill">{draft ? "待确认" : "已启用"}</span><h2>{plan.starts_on} — {plan.ends_on}</h2><details className="plan-rationale"><summary>安排依据</summary><p>{rationale}</p></details></div>
         <div className="plan-stats"><div><strong>{plan.tasks.length}</strong><span>项任务</span></div><div><strong>{plan.tasks.reduce((sum, task) => sum + task.duration_minutes, 0)}</strong><span>分钟</span></div><div><strong>{completed}</strong><span>已完成</span></div></div>
-        {draft && <button className="approve-button" onClick={() => approve.mutate()} disabled={approve.isPending}>{approve.isPending ? <LoaderCircle className="spin" size={17} /> : <Check size={18} />}{approve.isPending ? "正在启用…" : "启用计划"}</button>}
+        {draft && <button className="approve-button" onClick={() => approve.mutate()} disabled={approve.isPending || generate.isPending || !!draft.conflicts.length}>{approve.isPending ? <LoaderCircle className="spin" size={17} /> : <Check size={18} />}{approve.isPending ? "正在启用…" : "启用计划"}</button>}
       </section>
       {plan.conflicts.length > 0 && <div className="notice warning"><CircleAlert size={18} /><div><strong>安排限制</strong>{plan.conflicts.map((conflict) => <p key={conflict}>{conflict}</p>)}</div></div>}
-      <section className="week-grid">{dates.map((date) => {
+      <section className="week-grid" style={{ gridTemplateColumns: `repeat(${dates.length || 1}, minmax(140px, 1fr))` }}>{dates.map((date) => {
         const tasks = plan.tasks.filter((task) => task.scheduled_date === date);
         const minutes = tasks.reduce((sum, task) => sum + task.duration_minutes, 0);
-        const day = new Date(`${date}T12:00:00`).getDay() || 7;
+        const day = new Date(`${date}T00:00:00Z`).getUTCDay() || 7;
         const capacity = dashboard.data?.profile?.minutes_by_weekday[String(day)] ?? 0;
         return <article className="day-column" key={date}>
           <header><div><strong>{formatDate(date)}</strong><span>{minutes} / {capacity} 分钟</span></div><div className="capacity-track"><span style={{ width: `${capacity ? Math.min(100, minutes / capacity * 100) : 0}%` }} /></div></header>

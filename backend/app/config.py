@@ -1,8 +1,9 @@
 import os
 from functools import lru_cache
 from pathlib import Path
+from zoneinfo import ZoneInfo
 
-from pydantic import Field
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 PROJECT_ENV_FILE = Path(__file__).resolve().parents[2] / ".env"
@@ -12,6 +13,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=(PROJECT_ENV_FILE, ".env"), extra="ignore")
 
     app_env: str = "development"
+    learning_timezone: str = "Asia/Shanghai"
     api_host: str = "0.0.0.0"
     api_port: int = 8000
     database_url: str = "sqlite+aiosqlite:///./ielts_coach.db"
@@ -32,6 +34,8 @@ class Settings(BaseSettings):
     coach_model: str = "deepseek-chat"
     coach_offline: bool = False
     vocabulary_worker_enabled: bool = True
+    rag_evidence_chars: int = Field(default=18000, ge=2000, le=40000)
+    rag_source_chars: int = Field(default=5000, ge=320, le=16000)
     coach_max_output_tokens: int = Field(default=6000, ge=512, le=16000)
     embedding_provider: str = "auto"
     embedding_api_key: str | None = None
@@ -45,6 +49,15 @@ class Settings(BaseSettings):
     redis_url: str = "redis://localhost:6379/0"
     upload_dir: Path = Path("uploads")
     max_upload_mb: int = Field(default=10, ge=1, le=50)
+
+    @field_validator("learning_timezone")
+    @classmethod
+    def valid_timezone(cls, value):
+        try:
+            ZoneInfo(value)
+        except (KeyError, ValueError) as error:
+            raise ValueError("Unknown learning timezone") from error
+        return value
 
     @property
     def cors_origin_list(self) -> list[str]:

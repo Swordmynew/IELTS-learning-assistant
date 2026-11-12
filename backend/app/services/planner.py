@@ -15,6 +15,7 @@ from app.schemas import (
     TaskType,
     VocabularyEstimate,
 )
+from app.services.learning_time import learning_today
 
 
 @dataclass(frozen=True)
@@ -108,13 +109,17 @@ def _next_seven_days(start: date) -> list[date]:
     return [start + timedelta(days=offset) for offset in range(7)]
 
 
+def planning_days(profile: LearnerProfileCreate, start: date) -> list[date]:
+    return [day for day in _next_seven_days(start) if day < profile.exam_date]
+
+
 def _greedy_schedule(
     profile: LearnerProfileCreate,
     candidates: list[tuple[TaskTemplate, float]],
     start: date,
 ) -> tuple[list[StudyTask], list[str]]:
     """Deterministic fallback used when OR-Tools is unavailable."""
-    remaining = {day: profile.minutes_by_weekday.get(day.isoweekday(), 0) for day in _next_seven_days(start)}
+    remaining = {day: profile.minutes_by_weekday.get(day.isoweekday(), 0) for day in planning_days(profile, start)}
     high_loads = {day: 0 for day in remaining}
     tasks: list[StudyTask] = []
     ordered = sorted(
@@ -163,7 +168,9 @@ def _cp_sat_schedule(
 ) -> tuple[list[StudyTask], list[str]]:
     from ortools.sat.python import cp_model
 
-    days = _next_seven_days(start)
+    days = planning_days(profile, start)
+    if not days:
+        return _greedy_schedule(profile, candidates, start)
     model = cp_model.CpModel()
     assignments: dict[tuple[int, int], cp_model.IntVar] = {}
     for candidate_index in range(len(candidates)):
@@ -239,7 +246,7 @@ def build_week_plan(
     start: date | None = None,
     vocabulary_learning: dict | None = None,
 ) -> StudyPlan:
-    start = start or date.today()
+    start = start or learning_today()
     candidates = _candidates(profile, estimates or [], vocabulary_learning)
     try:
         tasks, conflicts = _cp_sat_schedule(profile, candidates, start)
@@ -264,7 +271,7 @@ def build_week_plan(
     vocabulary_note = f"词汇复习按到期词卡和个人积累安排，当前有 {(vocabulary_learning or {}).get('due', 0)} 个词待复习。"
     return StudyPlan(
         starts_on=start,
-        ends_on=start + timedelta(days=6),
+        ends_on=max(start, min(start + timedelta(days=6), profile.exam_date - timedelta(days=1))),
         rationale=(
             f"已按照你每天可用的时间安排任务，本周优先加强{focus}。{vocabulary_note}"
         ),
@@ -275,7 +282,13 @@ def build_week_plan(
 
 def validate_plan(plan: StudyPlan, profile: LearnerProfileCreate) -> list[str]:
     errors: list[str] = []
-    for day in _next_seven_days(plan.starts_on):
+    expected_end = min(plan.starts_on + timedelta(days=6), profile.exam_date - timedelta(days=1))
+    if plan.ends_on > expected_end or plan.ends_on < plan.starts_on:
+        errors.append("plan range must end before the exam and within seven days")
+    for task in plan.tasks:
+        if not plan.starts_on <= task.scheduled_date <= plan.ends_on or task.scheduled_date >= profile.exam_date:
+            errors.append(f"{task.scheduled_date.isoformat()} is outside the valid pre-exam plan range")
+    for day in sorted({task.scheduled_date for task in plan.tasks} | set(_next_seven_days(plan.starts_on))):
         day_tasks = [task for task in plan.tasks if task.scheduled_date == day]
         total = sum(task.duration_minutes for task in day_tasks)
         limit = profile.minutes_by_weekday.get(day.isoweekday(), 0)

@@ -25,7 +25,7 @@ flowchart LR
 
 The shared generation adapter uses `COACH_*` configuration independently of the legacy Responses adapter. It never silently substitutes a heuristic estimate for a failed live request. An exact-context cache includes the user's knowledge revision and model/prompt/schema configuration. Cache misses preserve submitted work and expose a separate fixed demo. Cache and demo modes are visible in the UI.
 
-Personal records carry source links, category, subject, timestamps and concise provenance. They inform cross-subject learning advice but cannot replace public writing-rubric authority. The model sees full retrieved chunks; citation cards show excerpts and source links. Portable vector/keyword ranking is used on SQLite and PostgreSQL for this course-sized corpus; older PostgreSQL FTS helpers are retained but are not used by the new path. Model changes require re-embedding both document and personal vectors.
+Personal records carry source links, category, subject, timestamps and concise provenance. They inform cross-subject learning advice but cannot replace public writing-rubric authority. The model sees only the selected evidence within the configured total/per-source character budgets; citation cards retain exact contiguous excerpts and source links. Citation IDs are restricted to evidence actually included in the request. Portable vector/keyword ranking is used on SQLite and PostgreSQL for this course-sized corpus; older PostgreSQL FTS helpers are retained but are not used by the new path. Model changes require re-embedding both document and personal vectors.
 
 The vocabulary diagnostic is a separate measurement path. It does not convert an uncalibrated vocabulary result directly into an IELTS band, because that relationship has not yet been established with validation data.
 
@@ -46,30 +46,41 @@ stateDiagram-v2
   Plan --> Validate
   Validate --> Draft
   Draft --> Approved: user approves
-  Draft --> Draft: user changes constraints
+  Draft --> Superseded: profile changes
+  Draft --> Failed: conflicts prevent approval
   Approved --> Superseded: a new draft is approved
 ```
 
 The current planning graph uses deterministic diagnosis and task templates rather than a language-model planning call. CP-SAT owns daily capacity, required weekly sessions and high-load limits. `validate_plan` is run after every solver result, including the deterministic fallback.
 
-The database transition from `draft` to `approved` is the human-in-the-loop boundary. It is intentionally outside the model turn: approval can be audited, retried with an idempotency key, and cannot be fabricated by generated text.
+Plans stop before the exam date and span at most seven days. Stored profile signatures and base-plan IDs detect stale drafts; user-level transaction serialization plus a partial unique index enforce one approved plan per user. The database transition from `draft` to `approved` is the human-in-the-loop boundary. It is intentionally outside the model turn: approval can be audited, retried with an idempotency key, and cannot be fabricated by generated text.
 
 ## Retrieval flow
 
 ```mermaid
 flowchart TD
-  Q[Chinese or English query] --> E[Local multilingual FastEmbed]
-  Q --> FTS[PostgreSQL English FTS]
-  E --> Dense[pgvector cosine top 20]
-  FTS --> Sparse[Keyword top 20]
-  Dense --> RRF[RRF k=60]
-  Sparse --> RRF
-  RRF --> Top[Top 6 cited chunks]
+  Q[Question and bounded follow-up context] --> V[Embedding similarity]
+  Q --> K[English tokens / Chinese bigrams / sparse ranking]
+  Docs[Visible public and private chunks] --> Filter[Authenticated owner filter]
+  Memory[Personal knowledge and learning events] --> Filter
+  Filter --> V
+  Filter --> K
+  V --> Rank[Combined ranking and learning-state signals]
+  K --> Rank
+  Rank --> Budget[Per-source and total evidence budgets]
+  Budget --> Generate[Generation or explicit offline retrieval fallback]
+  Generate --> Cite[Validated IDs and source/page viewer]
 ```
 
-PostgreSQL is the production source of truth. The default `paraphrase-multilingual-MiniLM-L12-v2` model produces 384-dimensional vectors locally, without an embedding API. `embedding_vector vector(384)` powers HNSW retrieval and the generated `search_tsv` column powers keyword retrieval. A JSON copy of embeddings supports SQLite smoke tests and migration/debugging. A model change requires re-embedding existing chunks; the migration deliberately treats vectors as reproducible derived data.
+The new coach path uses portable vector/keyword ranking on SQLite and PostgreSQL; the older PostgreSQL FTS/pgvector helpers remain separate and are not the current coach execution path. Database-side retrieval and an independent reranker are future candidates. Do not report their evaluation results before measuring them.
 
-Metadata fields are designed for `module`, `task_type`, `criterion`, `band`, `license`, document version, page and owner. Tenant filtering is applied before ranking, never after it.
+The default semantic embedding configuration is local multilingual FastEmbed, with 384-dimensional vectors. The verified local preview explicitly uses hashing for deterministic demos. Semantic quality, PostgreSQL performance and real-provider generation remain unverified. Switching embedding models requires re-embedding both document and personal vectors.
+
+Follow-up queries use bounded conversation context; independent questions are not indiscriminately appended to earlier ones. Configured limits bound history and evidence. Editing/merging/deleting personal knowledge advances its revision, invalidates matching caches, and marks historical contexts stale; a generation-time revision guard rejects stale new results.
+
+Text PDFs use pypdf and preserve physical page numbers, including gaps from blank pages. Scans require OCR. Chunk and original-file routes check authenticated ownership; source bookmarks preserve the selected chunk/page and the original quote separately from the learner note. Private file responses use private/no-store cache headers.
+
+Metadata includes module, criterion, source, license, page and owner where supplied. Tenant filtering precedes ranking. The planning graph's retrieve result is not yet used in task selection.
 
 ## Writing assessment
 

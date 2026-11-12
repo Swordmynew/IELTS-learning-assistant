@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import os
+import re
 from pathlib import Path
 
 from sqlalchemy import delete, select
@@ -12,23 +13,45 @@ from app.services.embeddings import embed_text
 
 
 def _chunk_text(text: str, target_words: int = 350) -> list[str]:
-    paragraphs = [item.strip() for item in text.splitlines() if item.strip()]
-    chunks: list[str] = []
-    current: list[str] = []
-    count = 0
-    for paragraph in paragraphs:
-        size = len(paragraph.split())
-        if current and count + size > target_words:
-            chunks.append("\n".join(current))
-            current, count = [], 0
-        current.append(paragraph)
-        count += size
+    chunks, current = [], ""
+    char_limit = target_words * 6
+    for paragraph in (line.strip() for line in text.splitlines() if line.strip()):
+        while paragraph:
+            if len(paragraph) > char_limit:
+                boundary = paragraph.rfind(" ", 0, char_limit)
+                boundary = boundary if boundary >= char_limit // 2 else char_limit
+            else:
+                boundary = len(paragraph)
+            piece, paragraph = paragraph[:boundary].strip(), paragraph[boundary:].strip()
+            if current and (len(current) + len(piece) > char_limit or len(re.findall(r"\S+", current + " " + piece)) > target_words):
+                chunks.append(current)
+                current = ""
+            current = (current + "\n" + piece).strip()
     if current:
-        chunks.append("\n".join(current))
+        chunks.append(current)
+    return chunks
+
+
+def _extract_pdf(path: Path) -> list[tuple[str, int]]:
+    from pypdf import PdfReader
+
+    reader = PdfReader(path)
+    if reader.is_encrypted and not reader.decrypt(""):
+        raise RuntimeError("PDF 已加密，请先解密后上传")
+    chunks = []
+    for number, page in enumerate(reader.pages, start=1):
+        text = page.extract_text() or ""
+        if not text.strip() and len(page.images):
+            raise RuntimeError(f"PDF 第 {number} 页需要 OCR；当前支持文本型 PDF")
+        chunks.extend((chunk, number) for chunk in _chunk_text(text))
+    if not chunks:
+        raise RuntimeError("PDF 中没有可检索文字；扫描件需要先做 OCR")
     return chunks
 
 
 def _extract(path: Path) -> list[tuple[str, int | None]]:
+    if path.suffix.lower() == ".pdf":
+        return _extract_pdf(path)
     if path.suffix.lower() in {".txt", ".md"}:
         return [(chunk, None) for chunk in _chunk_text(path.read_text(encoding="utf-8"))]
     os.environ.setdefault(
@@ -39,7 +62,7 @@ def _extract(path: Path) -> list[tuple[str, int | None]]:
         from docling_core.transforms.chunker.hybrid_chunker import HybridChunker
     except ImportError as error:
         raise RuntimeError(
-            "PDF/DOCX ingestion requires the optional 'documents' dependency"
+            "DOCX ingestion requires the optional 'documents' dependency"
         ) from error
     document = DocumentConverter().convert(source=str(path)).document
     chunks = HybridChunker().chunk(document)
@@ -54,7 +77,9 @@ async def _persist(document_id: str, path: Path) -> None:
         if not document:
             return
         try:
-            extracted = _extract(path)
+            extracted = await asyncio.to_thread(_extract, path)
+            if not extracted:
+                raise RuntimeError("文件中没有可检索文字")
             await session.execute(
                 delete(KnowledgeChunkRow).where(KnowledgeChunkRow.document_id == document_id)
             )
@@ -96,6 +121,10 @@ async def _persist(document_id: str, path: Path) -> None:
             document.status = "completed"
             document.error = None
         except Exception as error:  # worker boundary: persist a user-visible failure
+            await session.rollback()
+            document = await session.get(KnowledgeDocumentRow, document_id, populate_existing=True)
+            if not document:
+                return
             document.status = "failed"
             document.error = str(error)[:1000]
         await session.commit()

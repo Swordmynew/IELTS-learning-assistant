@@ -15,6 +15,7 @@ from app.coach_schemas import GeneratedResult
 from app.config import get_settings
 from app.db import CoachRecord, KnowledgeChunkRow
 from app.services.coach_prompts import COACH_VOICE
+from app.services.learning_memory import memory_revision
 
 logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
@@ -39,6 +40,7 @@ async def generate(
 ) -> GeneratedResult | None:
     settings = get_settings()
     model = settings.coach_model
+    generation_revision = await memory_revision(session, user_id)
     learning = list(
         await session.scalars(
             select(CoachRecord)
@@ -65,6 +67,7 @@ async def generate(
     key = fingerprint(
         [
             PROMPT_VERSION,
+            generation_revision,
             purpose,
             context,
             revision,
@@ -87,7 +90,8 @@ async def generate(
         if validate:
             validate(parsed)
         return GeneratedResult.model_validate(cached.payload).model_copy(update={"mode": "cache"})
-    api_key = settings.coach_api_key or settings.openai_api_key
+    # Keep Chat Completions credentials separate from the legacy Responses provider.
+    api_key = settings.coach_api_key
     if api_key and not settings.coach_offline:
         from openai import AsyncOpenAI
 
@@ -169,6 +173,9 @@ async def generate(
                         ]
                         if attempt:
                             raise
+                if await memory_revision(session, user_id) != generation_revision:
+                    logger.info("coach memory changed during generation purpose=%s", purpose)
+                    return None
                 result = GeneratedResult(
                     mode="live",
                     generated_at=datetime.now(UTC).isoformat(),
@@ -199,7 +206,7 @@ async def generate(
         except Exception as error:
             # Log error class only: providers may echo private request content in error messages.
             logger.warning("coach unavailable purpose=%s error=%s", purpose, type(error).__name__)
-    if cached:
+    if cached and await memory_revision(session, user_id) == generation_revision:
         result = GeneratedResult.model_validate(cached.payload)
         parsed = output.model_validate(result.data)
         if validate:

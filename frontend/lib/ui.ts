@@ -12,7 +12,7 @@ export const skillRoutes: Record<PlanSkill, string> = {
 export const weekdayLabels = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"];
 
 export function formatDate(date: string) {
-  return new Date(`${date}T12:00:00`).toLocaleDateString("zh-CN", { month: "long", day: "numeric", weekday: "short" });
+  return new Date(`${date}T00:00:00Z`).toLocaleDateString("zh-CN", { timeZone: "UTC", month: "long", day: "numeric", weekday: "short" });
 }
 
 export function taskAction(task: StudyTask) {

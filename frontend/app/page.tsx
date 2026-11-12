@@ -21,7 +21,7 @@ function DashboardContent() {
   const profile = data?.profile;
   const plan = data?.active_plan;
   const progress = data?.total_tasks ? Math.round(data.completed_tasks / data.total_tasks * 100) : 0;
-  const today = new Date().toISOString().slice(0, 10);
+  const today = dashboard.data?.learning_today ?? new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Shanghai", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
   const upcoming = plan?.tasks.filter((task) => !task.completed && task.scheduled_date >= today).slice(0, 3) ?? [];
   const focus = profile ? Object.entries(profile.current_scores).sort(([left, a], [right, b]) =>
     profile.target_scores[right as keyof typeof profile.target_scores] - b - (profile.target_scores[left as keyof typeof profile.target_scores] - a))[0]?.[0] : undefined;

@@ -6,16 +6,17 @@ import { createContext, useContext, useEffect, useRef, useState, type ReactNode 
 import { Tutor } from "./coach-components";
 import { useAuth } from "./providers";
 
-type Scope = { versionId?: string; sourceType?: string; documentIds?: string[] };
+type Scope = { versionId?: string; sourceType?: string; documentIds?: string[]; topicTags?: string[] };
 const TutorContext = createContext<(scope: Scope) => void>(() => undefined);
 
-export function TutorScope({ versionId, sourceType = "all", documentIds = [] }: Scope) {
+export function TutorScope({ versionId, sourceType = "all", documentIds = [], topicTags = [] }: Scope) {
   const setScope = useContext(TutorContext);
   const documents = JSON.stringify(documentIds);
+  const topics = JSON.stringify(topicTags);
   useEffect(() => {
-    setScope({ versionId, sourceType, documentIds: JSON.parse(documents) });
+    setScope({ versionId, sourceType, documentIds: JSON.parse(documents), topicTags: JSON.parse(topics) });
     return () => setScope({});
-  }, [setScope, versionId, sourceType, documents]);
+  }, [setScope, versionId, sourceType, documents, topics]);
   return null;
 }
 
@@ -31,7 +32,7 @@ export function TutorProvider({ children }: { children: ReactNode }) {
   const title = writing ? "问问这篇作文" : "个人学习助手";
   const available = !!token && !!user && pathname !== "/login" && pathname !== "/register";
   // A route can briefly retain the previous page's scope while its effects clean up.
-  const activeScope: Scope = writing ? { versionId: scope.versionId } : pathname === "/resources" ? { sourceType: scope.sourceType, documentIds: scope.documentIds } : {};
+  const activeScope: Scope = writing ? { versionId: scope.versionId } : pathname === "/resources" ? { sourceType: scope.sourceType, documentIds: scope.documentIds, topicTags: scope.topicTags } : {};
   const close = () => { setOpen(false); launcher.current?.focus(); };
 
   useEffect(() => {
@@ -56,7 +57,7 @@ export function TutorProvider({ children }: { children: ReactNode }) {
     {children}
     {available && <div className="floating-tutor">
       {visited && <div ref={panel} id="learning-assistant" className="floating-tutor-panel" role="dialog" aria-label={title} hidden={!open}>
-        <Tutor key={`${token}:${writing}:${activeScope.versionId ?? ""}:${activeScope.sourceType ?? "all"}:${JSON.stringify(activeScope.documentIds ?? [])}`} token={token!} {...activeScope} writingPage={writing} onClose={close} />
+        <Tutor key={`${token}:${writing}:${activeScope.versionId ?? ""}:${activeScope.sourceType ?? "all"}:${JSON.stringify(activeScope.documentIds ?? [])}:${JSON.stringify(activeScope.topicTags ?? [])}`} token={token!} {...activeScope} writingPage={writing} onClose={close} />
       </div>}
       <button ref={launcher} className="tutor-launcher" aria-label={open ? "收起学习助手" : `打开${title}`} aria-expanded={open} aria-controls={visited ? "learning-assistant" : undefined} onClick={() => { setVisited(true); setOpen(value => !value); }}>
         {open ? <X size={22} /> : <MessageCircle size={22} />}<span>{title}</span>

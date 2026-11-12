@@ -8,6 +8,7 @@ from sqlalchemy import (
     Boolean,
     DateTime,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -59,6 +60,10 @@ class LearnerProfileRow(Base):
 
 class StudyPlanRow(Base):
     __tablename__ = "study_plans"
+    __table_args__ = (
+        Index("uq_study_plans_one_approved", "user_id", unique=True,
+              sqlite_where=text("status = 'approved'"), postgresql_where=text("status = 'approved'")),
+    )
 
     id: Mapped[str] = mapped_column(String(36), primary_key=True)
     user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)

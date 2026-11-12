@@ -14,6 +14,7 @@ from app.db import (
     WritingAssessmentRow,
 )
 from app.services.embeddings import embed_text
+from app.services.learning_memory import invalidate_memory, record_event, topics_for
 
 
 async def put_knowledge(
@@ -28,6 +29,8 @@ async def put_knowledge(
     status: str = "review",
     event_id: str = "",
     source_summary: str = "",
+    topic_tags: list[str] | None = None,
+    occurred_at: str | None = None,
 ) -> None:
     row = await session.scalar(
         select(CoachRecord).where(
@@ -37,10 +40,16 @@ async def put_knowledge(
         )
     )
     if row and row.payload.get("event_id") == event_id:
+        if not row.payload.get("deleted"):
+            await record_event(session, row, event_id, occurred_at=occurred_at)
         return
     if row and row.payload.get("deleted"):
         if target_id := row.payload.get("merged_into"):
             target = await session.get(CoachRecord, target_id)
+            seen = {row.id}
+            while target and target.user_id == user_id and target.payload.get("deleted") and target.payload.get("merged_into") and target.id not in seen:
+                seen.add(target.id)
+                target = await session.get(CoachRecord, target.payload["merged_into"])
             if target and target.user_id == user_id and not target.payload.get("deleted"):
                 merged = {
                     **target.payload.get("merged_records", {}),
@@ -50,6 +59,7 @@ async def put_knowledge(
                         "source_link": link,
                         "source_summary": source_summary,
                         "status": status,
+                        "item_id": row.id,
                     },
                 }
                 data = {
@@ -59,7 +69,9 @@ async def put_knowledge(
                 }
                 await index_payload(data)
                 target.payload = data
+                await record_event(session, row, event_id, occurred_at=occurred_at, snapshot={"title": title, "content": content, "status": status, "source_link": link, "topic_tags": topic_tags or topics_for(data)})
                 row.payload = {**row.payload, "event_id": event_id}
+                await invalidate_memory(session, user_id, {row.id, target.id})
         return
     old = row.payload if row else {}
     data = {
@@ -72,20 +84,26 @@ async def put_knowledge(
         "source_summary": source_summary,
         "status": status,
         "event_id": event_id,
+        "state_source": "practice",
+        "provenance": old.get("provenance", "personal-learning-record"),
         "updated_at": datetime.now(UTC).isoformat(),
     }
+    data["topic_tags"] = old.get("topic_tags") if old.get("topic_origin") == "user" else sorted(set(topic_tags or []) | set(topics_for(data)))
+    data["topic_origin"] = old.get("topic_origin", "suggested")
     await index_payload(data)
     if row:
         row.payload = data
     else:
-        session.add(CoachRecord(user_id=user_id, kind="knowledge", source_key=key, payload=data))
+        row = CoachRecord(user_id=user_id, kind="knowledge", source_key=key, payload=data)
+        session.add(row)
     await session.flush()
+    await record_event(session, row, event_id, occurred_at=occurred_at)
 
 
 async def index_payload(data: dict) -> None:
     merged_text = "\n".join(item["content"] for item in data.get("merged_records", {}).values())
     vector, model = await embed_text(
-        f"{data['title']}\n{data['content']}\n{data.get('note', '')}\n{merged_text}", get_settings()
+        f"{data['title']}\n{data['content']}\n{data.get('note', '')}\n{' '.join(topics_for(data))}\n{merged_text}", get_settings()
     )
     data["embedding"] = vector
     data["embedding_model"] = model
@@ -122,6 +140,8 @@ async def capture_attempt(
         f"/question-bank?module={question.module}&question={question.id}",
         status="correct_latest" if attempt.is_correct else "review",
         event_id=attempt.id,
+        topic_tags=question.tags or [],
+        occurred_at=attempt.created_at.isoformat(),
     )
 
 
@@ -188,7 +208,24 @@ async def backfill(session: AsyncSession, user_id: str) -> int:
             f"/question-bank?module={question.module}&question={question.id}",
             status="correct_latest" if attempt.is_correct else "review",
             event_id=attempt.id,
+        topic_tags=question.tags or [],
+        occurred_at=attempt.created_at.isoformat(),
         )
+    for attempt, question in attempts:
+        if question.id not in wrong_ids:
+            continue
+        memory = await session.scalar(select(CoachRecord).where(
+            CoachRecord.user_id == user_id, CoachRecord.kind == "knowledge",
+            CoachRecord.source_key == f"question:{question.id}",
+        ))
+        if memory and (not memory.payload.get("deleted") or memory.payload.get("merged_into")):
+            await record_event(session, memory, attempt.id, occurred_at=attempt.created_at.isoformat(), snapshot={
+                "title": question.prompt[:160],
+                "content": f"题目：{question.prompt}\n作答：{attempt.submitted_answer}\n参考答案：{question.correct_answer}",
+                "status": "correct_latest" if attempt.is_correct else "review",
+                "source_link": f"/question-bank?module={question.module}&question={question.id}",
+                "topic_tags": question.tags or topics_for(memory.payload),
+            })
     vocab_rows = list(
         await session.scalars(
             select(VocabularyTestSessionRow)
@@ -225,6 +262,23 @@ async def backfill(session: AsyncSession, user_id: str) -> int:
             status="correct_latest" if response["correct"] else "review",
             event_id=f"{row.id}:{item.id}",
         )
+    for historical in vocab_rows:
+        for response in historical.responses:
+            item = ITEMS_BY_ID[response["item_id"]]
+            if item.surface not in wrong_words:
+                continue
+            memory = await session.scalar(select(CoachRecord).where(
+                CoachRecord.user_id == user_id, CoachRecord.kind == "knowledge",
+                CoachRecord.source_key == f"word:{item.surface.lower()}",
+            ))
+            if memory and (not memory.payload.get("deleted") or memory.payload.get("merged_into")):
+                options = [*item.options, "以上都不是"]
+                await record_event(session, memory, f"{historical.id}:{item.id}", occurred_at=historical.created_at.isoformat(), snapshot={
+                    "title": item.surface,
+                    "content": f"单词：{item.surface}\n作答：{options[response['selected_option']]}\n正确释义：{options[item.correct_index]}",
+                    "status": "correct_latest" if response["correct"] else "review",
+                    "source_link": f"/vocabulary?test={historical.id}", "topic_tags": ["lexical.meaning"],
+                })
     coach_versions = set(
         await session.scalars(
             select(CoachRecord.id).where(
@@ -267,7 +321,7 @@ def knowledge_source_summary(data: dict) -> str:
 
 
 def knowledge_view(row: CoachRecord) -> dict:
-    data = {k: v for k, v in row.payload.items() if k not in {"embedding", "pending", "confirmed"}}
+    data = {k: v for k, v in row.payload.items() if k not in {"embedding", "pending", "confirmed", "request_digest"}}
     if data.get("category") == "vocabulary":
         data["source_summary"] = knowledge_source_summary(data)
     if "merged_records" in data:
@@ -276,4 +330,4 @@ def knowledge_view(row: CoachRecord) -> dict:
                   "source_summary": knowledge_source_summary(item)}
             for key, item in data["merged_records"].items()
         }
-    return {"id": row.id, **data}
+    return {"id": row.id, **data, "topic_tags": topics_for(data)}

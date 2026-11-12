@@ -76,6 +76,7 @@ export interface VocabularyTest {
 }
 
 export interface Dashboard {
+  learning_today?: string;
   profile: Profile | null;
   active_plan: StudyPlan | null;
   completed_tasks: number;
@@ -94,6 +95,11 @@ export interface KnowledgeDocument {
   error?: string;
   is_private: boolean;
   created_at: string;
+}
+
+export interface DocumentSource {
+  id: string; title: string; filename: string; page_numbers: number[]; original_available: boolean; total: number; offset: number;
+  items: { id: string; page: number | null; chunk_index: number; content: string }[];
 }
 
 export interface PracticeQuestion {
@@ -191,6 +197,38 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
   return response.json() as Promise<T>;
 }
 
+export interface PlanningProgress { node?: string; status: string; message?: string; plan_id?: string; run_id?: string }
+
+export async function generatePlanStream(token: string, onProgress: (event: PlanningProgress) => void): Promise<StudyPlan> {
+  const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "/api/v1"}/agent/runs/stream`, {
+    method: "POST", headers: { Authorization: `Bearer ${token}`, "Idempotency-Key": crypto.randomUUID() },
+  });
+  if (!response.ok || !response.body) throw new Error("规划连接失败，请重试");
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  let buffer = "";
+  let result: StudyPlan | undefined;
+  try {
+    while (true) {
+      const { value, done } = await reader.read();
+      buffer += decoder.decode(value, { stream: !done }).replace(/\r\n/g, "\n");
+      let boundary: number;
+      while ((boundary = buffer.indexOf("\n\n")) !== -1) {
+        const frame = buffer.slice(0, boundary); buffer = buffer.slice(boundary + 2);
+        const data = frame.split("\n").filter(line => line.startsWith("data:")).map(line => line.slice(5).trim()).join("\n");
+        if (!data) continue;
+        const event = JSON.parse(data) as PlanningProgress & { detail?: string; plan?: StudyPlan };
+        if (event.status === "failed") throw new Error(event.detail ?? "规划执行失败，请重新生成");
+        onProgress(event);
+        if (event.status === "completed" && event.plan && event.plan.id === event.plan_id) result = event.plan;
+      }
+      if (done) break;
+    }
+  } finally { await reader.cancel().catch(() => undefined); reader.releaseLock(); }
+  if (!result) throw new Error("规划连接已中断，请重新生成");
+  return result;
+}
+
 export const api = {
   login: (email: string, password: string) =>
     request<TokenResponse>("/auth/login", {
@@ -220,6 +258,7 @@ export const api = {
       method: "PUT",
       body: JSON.stringify(payload),
     }, token),
+  documentChunks: (token: string, id: string, page?: number, offset = 0) => request<DocumentSource>(`/knowledge/documents/${encodeURIComponent(id)}/chunks?offset=${offset}${page ? `&page=${page}` : ""}`, {}, token),
   dashboard: (token: string) => request<Dashboard>("/dashboard", {}, token),
   saveDiagnostic: (token: string, payload: Profile) =>
     request<Profile>("/diagnostics", {

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hashlib
+import json
 from datetime import UTC, datetime
 
 from fastapi import HTTPException
@@ -10,11 +12,12 @@ from app.db import (
     LearnerProfileRow,
     StudyPlanRow,
     StudyTaskRow,
+    User,
     VocabularyTestSessionRow,
     WritingAssessmentRow,
 )
 from app.schemas import (
-    LearnerProfileCreate,
+    LearnerProfileRead,
     PlanStatus,
     SkillEstimate,
     StudyPlan,
@@ -26,16 +29,40 @@ from app.schemas import (
 )
 
 
+async def lock_planning_user(session: AsyncSession, user_id: str) -> None:
+    # A database row write serializes profile edits, draft saves and approvals across workers.
+    result = await session.execute(update(User).where(User.id == user_id).values(id=User.id).execution_options(synchronize_session=False))
+    if result.rowcount != 1:
+        raise HTTPException(404, "User not found")
+
+
+def profile_signature(profile: LearnerProfileRead, estimates: list[SkillEstimate]) -> str:
+    data = {"profile": profile.model_dump(mode="json"), "estimates": sorted([item.model_dump(mode="json") for item in estimates], key=lambda item: item["skill"])}
+    return hashlib.sha256(json.dumps(data, sort_keys=True).encode()).hexdigest()
+
+
+async def planning_context(session: AsyncSession, user_id: str) -> dict:
+    stored = await get_profile(session, user_id)
+    if not stored:
+        raise HTTPException(409, "请先填写学习档案")
+    active_id = await session.scalar(select(StudyPlanRow.id).where(StudyPlanRow.user_id == user_id, StudyPlanRow.status == "approved"))
+    return {"profile_signature": profile_signature(*stored), "base_active_plan_id": active_id}
+
+
 async def save_profile(
     session: AsyncSession,
     user_id: str,
-    profile: LearnerProfileCreate,
+    profile: LearnerProfileRead,
     estimates: list[SkillEstimate],
 ) -> None:
-    row = await session.scalar(select(LearnerProfileRow).where(LearnerProfileRow.user_id == user_id))
+    await lock_planning_user(session, user_id)
+    row = await session.scalar(select(LearnerProfileRow).where(LearnerProfileRow.user_id == user_id).execution_options(populate_existing=True))
     payload = profile.model_dump(mode="json")
     estimate_payload = [item.model_dump(mode="json") for item in estimates]
     if row:
+        if row.payload != payload or row.estimates != estimate_payload:
+            statuses = ["draft", "approved"] if any(row.payload.get(key) != payload.get(key) for key in ("exam_date", "minutes_by_weekday")) else ["draft"]
+            await session.execute(update(StudyPlanRow).where(StudyPlanRow.user_id == user_id, StudyPlanRow.status.in_(statuses)).values(status="superseded"))
         row.payload = payload
         row.estimates = estimate_payload
     else:
@@ -45,22 +72,29 @@ async def save_profile(
 
 async def get_profile(
     session: AsyncSession, user_id: str
-) -> tuple[LearnerProfileCreate, list[SkillEstimate]] | None:
-    row = await session.scalar(select(LearnerProfileRow).where(LearnerProfileRow.user_id == user_id))
+) -> tuple[LearnerProfileRead, list[SkillEstimate]] | None:
+    row = await session.scalar(select(LearnerProfileRow).where(LearnerProfileRow.user_id == user_id).execution_options(populate_existing=True))
     if not row:
         return None
     return (
-        LearnerProfileCreate.model_validate(row.payload),
+        LearnerProfileRead.model_validate(row.payload),
         [SkillEstimate.model_validate(item) for item in row.estimates],
     )
 
 
-async def save_plan(session: AsyncSession, user_id: str, plan: StudyPlan) -> None:
+async def save_plan(session: AsyncSession, user_id: str, plan: StudyPlan, context: dict | None = None, *, commit: bool = True) -> None:
+    await lock_planning_user(session, user_id)
+    from app.services.learning_time import learning_today
+    if plan.starts_on != learning_today():
+        raise HTTPException(409, "学习日期已变化，请重新生成草案")
+    current = await planning_context(session, user_id)
+    if context is not None and current != context:
+        raise HTTPException(409, "档案或正式计划已变化，请重新生成草案")
     row = StudyPlanRow(
         id=str(plan.id),
         user_id=user_id,
         status=plan.status.value,
-        payload=plan.model_dump(mode="json", exclude={"tasks"}),
+        payload={**plan.model_dump(mode="json", exclude={"tasks"}), "planning_context": context or current},
     )
     row.tasks = [
         StudyTaskRow(
@@ -73,7 +107,10 @@ async def save_plan(session: AsyncSession, user_id: str, plan: StudyPlan) -> Non
         for task in plan.tasks
     ]
     session.add(row)
-    await session.commit()
+    if commit:
+        await session.commit()
+    else:
+        await session.flush()
 
 
 def plan_from_row(row: StudyPlanRow) -> StudyPlan:
@@ -104,20 +141,44 @@ async def get_active_plan(session: AsyncSession, user_id: str) -> StudyPlan | No
 
 
 async def approve_plan(session: AsyncSession, user_id: str, plan_id: str) -> StudyPlan:
-    row = await get_plan(session, user_id, plan_id)
-    await session.execute(
-        update(StudyPlanRow)
-        .where(
-            StudyPlanRow.user_id == user_id,
-            StudyPlanRow.status == PlanStatus.approved.value,
-            StudyPlanRow.id != plan_id,
-        )
-        .values(status=PlanStatus.superseded.value)
-    )
-    row.status = PlanStatus.approved.value
-    await session.commit()
-    await session.refresh(row, attribute_names=["tasks"])
-    return plan_from_row(row)
+    from app.services.learning_time import learning_today
+    from app.services.planner import validate_plan
+
+    try:
+        await lock_planning_user(session, user_id)
+        row = await get_plan(session, user_id, plan_id)
+        await session.refresh(row, attribute_names=["status", "payload", "tasks"])
+        plan = plan_from_row(row)
+        stored = await get_profile(session, user_id)
+        if not stored or plan.ends_on < learning_today() or stored[0].exam_date <= learning_today():
+            raise HTTPException(409, "计划已过期，请更新档案并重新生成")
+        if row.status == "superseded":
+            raise HTTPException(409, "此草案已失效，请重新生成")
+        errors = validate_plan(plan, stored[0])
+        if errors:
+            raise HTTPException(409, "计划不满足当前时间约束，请调整档案并重新生成")
+        if row.status == "approved":
+            await session.commit()
+            return plan
+        if row.status != "draft" or plan.starts_on < learning_today():
+            raise HTTPException(409, "仅可启用当前有效草案")
+        expected = row.payload.get("planning_context")
+        if not expected or expected != await planning_context(session, user_id):
+            raise HTTPException(409, "档案或正式计划已变化，请重新生成草案")
+        await session.execute(update(StudyPlanRow).where(
+            StudyPlanRow.user_id == user_id, StudyPlanRow.status == "approved", StudyPlanRow.id != plan_id
+        ).values(status="superseded"))
+        result = await session.execute(update(StudyPlanRow).where(
+            StudyPlanRow.id == plan_id, StudyPlanRow.user_id == user_id, StudyPlanRow.status == "draft"
+        ).values(status="approved"))
+        if result.rowcount != 1:
+            raise HTTPException(409, "草案状态已变化，请刷新")
+        await session.commit()
+        await session.refresh(row, attribute_names=["status", "tasks"])
+        return plan_from_row(row)
+    except Exception:
+        await session.rollback()
+        raise
 
 
 async def complete_task(session: AsyncSession, user_id: str, task_id: str) -> StudyTask:
@@ -135,6 +196,7 @@ async def set_task_completion(
     *,
     completed: bool,
 ) -> StudyTask:
+    await lock_planning_user(session, user_id)
     row = await session.scalar(
         select(StudyTaskRow)
         .join(StudyPlanRow, StudyTaskRow.plan_id == StudyPlanRow.id)

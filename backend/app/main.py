@@ -8,6 +8,8 @@ from app.api import router
 from app.coach_api import router as coach_router
 from app.config import get_settings
 from app.db import create_schema
+from app.document_api import router as document_router
+from app.memory_api import router as memory_router
 from app.seed import seed_learning_guidance, seed_official_knowledge, seed_question_bank
 from app.services.vocabulary_extraction import extraction_worker
 from app.vocabulary_api import router as vocabulary_router
@@ -45,4 +47,6 @@ app.add_middleware(
 )
 app.include_router(router)
 app.include_router(coach_router)
+app.include_router(document_router)
+app.include_router(memory_router)
 app.include_router(vocabulary_router)

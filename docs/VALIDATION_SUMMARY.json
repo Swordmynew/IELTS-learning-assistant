@@ -1,0 +1,54 @@
+{
+  "typecheck": "passed",
+  "postgresql_verified": false,
+  "ruff": "passed",
+  "production_build": "passed in isolated copy",
+  "backend": {
+    "extra_pdf_recheck": 12,
+    "report": "backend-tests.xml",
+    "failures": 0,
+    "passed": 152
+  },
+  "real_model_verified": false,
+  "date": "2026-11-12T13:46:39.0935127+08:00",
+  "actual_user_database_modified": false,
+  "preview_backups": [
+    "preview-before-0008-20261112-133022.db"
+  ],
+  "preview_migration": "0008_plan_approval_guard",
+  "browser": {
+    "real_api": 6,
+    "latest_real_api_recheck": 6,
+    "report": "browser-tests.log",
+    "mocked": 14,
+    "passed": 20
+  },
+  "url": "http://127.0.0.1:3000",
+  "sqlite_migration": "0007 -> 0008 -> 0007 -> 0008 verified on disposable database",
+  "base_commit": "1b9d3d1c23a007077bc1464acc112e2d3187bcdb",
+  "validation_scope": "Working-tree implementation on base_commit, before the ccy最新 delivery commit; documentation added after implementation validation.",
+  "manual_ui_demo": {
+    "date": "2026-11-12",
+    "mode": "isolated local offline preview",
+    "verified": [
+      "profile view",
+      "plan generation and approval",
+      "task completion and restore",
+      "word reveal and review",
+      "intentional wrong answer and knowledge capture",
+      "personal search preview",
+      "source bookmark with separate note",
+      "fixed writing demo V1/V2 and hints",
+      "assistant retrieval-only fallback"
+    ]
+  },
+  "delivery_preflight": {
+    "backend": "152 passed in 26.17s",
+    "backend_report": "local ignored tmp/branch-ccy-latest-tests.xml",
+    "typecheck": "passed",
+    "ruff": "passed (--no-cache)",
+    "documentation_links": "9 entry/guide Markdown files checked; 0 broken local links",
+    "secret_scan": "157 tracked index files checked; no high-confidence token/private-key findings",
+    "staged_content": "66 reviewed source, test, dependency and documentation files; databases/uploads/cache/tmp excluded"
+  }
+}

@@ -3,7 +3,6 @@ from __future__ import annotations
 import asyncio
 import json
 import unicodedata
-from datetime import date
 from pathlib import Path
 from uuid import UUID
 
@@ -21,7 +20,6 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.agents.workflow import generate_plan_with_trace
 from app.auth import create_access_token, current_user, hash_password, verify_password
 from app.config import Settings, get_settings
 from app.db import (
@@ -29,6 +27,7 @@ from app.db import (
     KnowledgeDocumentRow,
     PracticeAttemptRow,
     PracticeQuestionRow,
+    SessionLocal,
     User,
     get_session,
 )
@@ -41,10 +40,10 @@ from app.repository import (
     get_latest_vocabulary_test,
     get_plan,
     get_profile,
+    lock_planning_user,
     plan_from_row,
     restore_task,
     save_assessment,
-    save_plan,
     save_profile,
 )
 from app.schemas import (
@@ -78,6 +77,8 @@ from app.schemas import (
     WritingAssessment,
     WritingSubmission,
 )
+from app.services.learning_time import learning_today
+from app.services.planning_runs import generate_stored_plan
 from app.services.question_bank import parse_question_file
 from app.services.search_repository import hybrid_search
 from app.services.vocabulary import (
@@ -174,7 +175,7 @@ async def demo_session(
         from datetime import timedelta
 
         demo_profile = DiagnosticRequest(
-            exam_date=date.today() + timedelta(days=60),
+            exam_date=learning_today() + timedelta(days=60),
             current_scores={skill: 5.5 for skill in Skill},
             target_scores={skill: 7.0 for skill in Skill},
             minutes_by_weekday={1: 60, 2: 45, 3: 60, 4: 45, 5: 60, 6: 120, 7: 90},
@@ -247,38 +248,9 @@ async def record_diagnostic(
 async def generate_plan(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
-    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key"),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=128),
 ) -> StudyPlan:
-    if idempotency_key:
-        existing = await session.scalar(
-            select(AgentRunRow).where(
-                AgentRunRow.user_id == user.id,
-                AgentRunRow.idempotency_key == idempotency_key,
-            )
-        )
-        if existing and existing.trace and existing.trace[-1].get("plan_id"):
-            row = await get_plan(session, user.id, existing.trace[-1]["plan_id"])
-            return plan_from_row(row)
-    stored = await get_profile(session, user.id)
-    if not stored:
-        raise HTTPException(status_code=409, detail="Complete a diagnostic before generating a plan")
-    profile, estimates = stored
-    from app.services.word_deck import deck
-    vocabulary_learning = (await deck(session, user.id, limit=1))["counts"]
-    plan, trace = await asyncio.to_thread(
-        generate_plan_with_trace, profile, estimates, None, vocabulary_learning
-    )
-    await save_plan(session, user.id, plan)
-    run = AgentRunRow(
-        user_id=user.id,
-        workflow="weekly-planning",
-        status="waiting_for_approval",
-        idempotency_key=idempotency_key,
-        trace=[*[{"node": node} for node in trace], {"plan_id": str(plan.id)}],
-    )
-    session.add(run)
-    await session.commit()
-    return plan
+    return await generate_stored_plan(session, user.id, idempotency_key)
 
 
 @router.post("/plans/{plan_id}/approve", response_model=StudyPlan)
@@ -288,8 +260,8 @@ async def set_plan_approval(
     user: User = Depends(current_user),
     session: AsyncSession = Depends(get_session),
 ) -> StudyPlan:
-    row = await get_plan(session, user.id, str(plan_id))
     if not body.approved:
+        row = await get_plan(session, user.id, str(plan_id))
         return plan_from_row(row)
     return await approve_plan(session, user.id, str(plan_id))
 
@@ -299,7 +271,7 @@ async def today_tasks(
     user: User = Depends(current_user), session: AsyncSession = Depends(get_session)
 ) -> list[StudyTask]:
     plan = await get_active_plan(session, user.id)
-    return [task for task in plan.tasks if task.scheduled_date == date.today()] if plan else []
+    return [task for task in plan.tasks if task.scheduled_date == learning_today()] if plan else []
 
 
 @router.post("/tasks/{task_id}/complete", response_model=StudyTask)
@@ -333,6 +305,7 @@ async def assess_writing(
     if errors:
         raise HTTPException(status_code=502, detail={"message": "Invalid model assessment", "errors": errors})
     await save_assessment(session, user.id, body, assessment)
+    await lock_planning_user(session, user.id)
     stored = await get_profile(session, user.id)
     if stored:
         profile, estimates = stored
@@ -622,10 +595,11 @@ async def submit_practice_attempt(
     )
     session.add(attempt)
     await session.commit()
-    stored_profile = await get_profile(session, user.id)
     from app.services.personal_knowledge import capture_attempt
     await capture_attempt(session, user.id, row, attempt)
     await session.commit()
+    await lock_planning_user(session, user.id)
+    stored_profile = await get_profile(session, user.id)
     profile_updated = False
     if stored_profile:
         profile, estimates = stored_profile
@@ -759,20 +733,46 @@ async def import_practice_questions(
 
 
 @router.post("/agent/runs/stream")
-async def stream_agent_run(user: User = Depends(current_user)) -> StreamingResponse:
+async def stream_agent_run(
+    user: User = Depends(current_user),
+    idempotency_key: str | None = Header(default=None, alias="Idempotency-Key", max_length=128),
+) -> StreamingResponse:
     async def events():
-        for node, message in (
-            ("intake", "读取学习目标与时间约束"),
-            ("diagnose", "计算四项能力差距"),
-            ("retrieve", "检索 IELTS 官方评分依据"),
-            ("plan", "生成候选学习任务"),
-            ("validate", "执行硬约束校验并等待用户审批"),
-        ):
-            yield f"data: {json.dumps({'node': node, 'message': message}, ensure_ascii=False)}\n\n"
-            await asyncio.sleep(0.05)
-        yield f"data: {json.dumps({'status': 'completed', 'user_id': user.id})}\n\n"
+        queue = asyncio.Queue()
 
-    return StreamingResponse(events(), media_type="text/event-stream")
+        async def execute():
+            async with SessionLocal() as session:
+                try:
+                    await generate_stored_plan(session, user.id, idempotency_key, queue.put)
+                except HTTPException as error:
+                    await queue.put({"status": "failed", "detail": error.detail, "code": error.status_code})
+                except Exception:
+                    await queue.put({"status": "failed", "detail": "规划服务暂不可用，请重试", "code": 500})
+                finally:
+                    await queue.put(None)
+
+        job = asyncio.create_task(execute())
+        try:
+            while (event := await queue.get()) is not None:
+                yield f"data: {json.dumps(event, ensure_ascii=False)}\n\n"
+            await job
+        finally:
+            if not job.done():
+                job.cancel()
+                try:
+                    await job
+                except asyncio.CancelledError:
+                    pass
+
+    return StreamingResponse(events(), media_type="text/event-stream", headers={"Cache-Control": "no-cache", "X-Accel-Buffering": "no"})
+
+
+@router.get("/agent/runs/{run_id}")
+async def agent_run_status(run_id: UUID, user: User = Depends(current_user), session: AsyncSession = Depends(get_session)):
+    row = await session.scalar(select(AgentRunRow).where(AgentRunRow.id == str(run_id), AgentRunRow.user_id == user.id))
+    if not row:
+        raise HTTPException(404, "Run not found")
+    return {"id": row.id, "status": row.status, "trace": row.trace, "finished_at": row.finished_at}
 
 
 @router.get("/health")

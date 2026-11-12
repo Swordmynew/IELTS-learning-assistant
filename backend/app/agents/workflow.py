@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from datetime import date
 from typing import Any, TypedDict
 
 from langgraph.graph import END, START, StateGraph
@@ -17,6 +18,7 @@ class PlanningState(TypedDict, total=False):
     validation_errors: list[str]
     vocabulary: dict[str, Any] | None
     vocabulary_learning: dict[str, Any] | None
+    starts_on: str
     trace: list[str]
 
 
@@ -54,7 +56,7 @@ def retrieve(state: PlanningState) -> PlanningState:
 def plan(state: PlanningState) -> PlanningState:
     profile = LearnerProfileCreate.model_validate(state["profile"])
     estimates = [SkillEstimate.model_validate(item) for item in state["estimates"]]
-    result = build_week_plan(profile, estimates, vocabulary_learning=state.get("vocabulary_learning"))
+    result = build_week_plan(profile, estimates, start=date.fromisoformat(state["starts_on"]) if state.get("starts_on") else None, vocabulary_learning=state.get("vocabulary_learning"))
     return {"plan": result.model_dump(mode="json"), "trace": _append_trace(state, "plan")}
 
 
