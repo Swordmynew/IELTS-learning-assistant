@@ -1,6 +1,6 @@
 # 第二轮补充与验收：规划可靠性、RAG 上下文及 PDF 来源
 
-日期：2026-11-12。分支：`feature/personal-learning-coach`，基线 `1b9d3d1`，包含 11 月 11 日个性化记忆首轮改动。本轮改动保存在本地，尚未提交或推送。
+日期：2026-11-12。分支：`feature/personal-learning-coach`，基线 `1b9d3d1`，包含 11 月 11 日个性化记忆首轮改动。这是实现时的来源基线；当前交付仓库和默认分支见 [START_HERE](../START_HERE.md)。
 
 ## 已实现
 

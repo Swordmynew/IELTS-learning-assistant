@@ -5,7 +5,7 @@
 本机已验证 Python：`D:\Anaconda3\envs\ielts-coach\python.exe`（3.11）。不要改动 ai-dev 的 AI/CUDA 配套；不要默认创建 uv/venv。其他电脑先找兼容的已有 Conda 环境，再设置解释器路径。
 
 ```powershell
-git clone --branch "ccy最新" https://github.com/Swordmynew/IELTS-learning-assistant.git
+git clone https://github.com/Charles-art36/IELTS-learning-assistant.git
 cd IELTS-learning-assistant
 $IeltsPython = 'D:\Anaconda3\envs\ielts-coach\python.exe'
 $env:PYTHONNOUSERSITE = '1'

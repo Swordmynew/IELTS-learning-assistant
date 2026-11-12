@@ -2,7 +2,7 @@
 
 ## 接手顺序
 
-先读 ../START_HERE.md、QUICKSTART.md、USER_GUIDE.md 和 ITERATION_2026-11-12.md，再跑 DEMO_WALKTHROUGH.md。不要先连接真实数据库或更换环境。
+先读 [START_HERE](../START_HERE.md)、[QUICKSTART](QUICKSTART.md)、[USER_GUIDE](USER_GUIDE.md) 和 [最新验收](ITERATION_2026-11-12.md)，再跑 [演示步骤](DEMO_WALKTHROUGH.md)。当前交付为个人仓库 main，克隆和推送说明见 [仓库使用](GITHUB_WORKFLOW.md)。不要先连接真实数据库或更换环境。
 
 ## 代码地图
 

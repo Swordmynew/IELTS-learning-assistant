@@ -2,7 +2,7 @@
 
 最新状态见 [第二轮补充与验收](ITERATION_2026-11-12.md)，本文件保留首轮基线与当时状态。
 
-代码位于 `upstream/personal-learning-coach`，基于 `feature/personal-learning-coach` 的 `1b9d3d1`，改动尚未提交或推送。
+代码位于 `upstream/personal-learning-coach`，基于 `feature/personal-learning-coach` 的 `1b9d3d1`，这是实现时的来源基线；当前交付仓库和默认分支见 [START_HERE](../START_HERE.md)。
 
 ## 已完成
 

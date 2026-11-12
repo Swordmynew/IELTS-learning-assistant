@@ -1,6 +1,6 @@
 # 从这里开始
 
-本分支：**ccy最新**。它包含 main 之上的个人学习教练功能，以及两轮本地完善；不改变 main。
+本项目交付到个人仓库 **[Charles-art36/IELTS-learning-assistant](https://github.com/Charles-art36/IELTS-learning-assistant)** 的 **main**。代码保留原项目与个人学习教练功能，以及两轮本地完善。原 Swordmynew 仓库和已有 IETLS 仓库保留。
 
 IELTS Adaptive Coach 是 Next.js + FastAPI 的 IELTS Academic 学习原型，帮助用户按目标与可用时间安排练习，将错题、作文问题和随手笔记组织成个人知识，并用于带来源的答疑。
 
@@ -8,6 +8,7 @@ IELTS Adaptive Coach 是 Next.js + FastAPI 的 IELTS Academic 学习原型，帮
 
 | 目的 | 文档 |
 | --- | --- |
+| GitHub 克隆和后续更新 | [仓库使用](docs/GITHUB_WORKFLOW.md) |
 | 第一次启动 | [快速启动](docs/QUICKSTART.md) |
 | 运行维护与配置 | [运行维护](docs/OPERATIONS.md) |
 | 开发接口 | [API 清单](docs/API_REFERENCE.md) |

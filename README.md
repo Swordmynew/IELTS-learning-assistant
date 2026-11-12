@@ -1,6 +1,6 @@
 # IELTS Adaptive Coach
 
-**当前分支：ccy最新。首次使用从 [START_HERE.md](START_HERE.md) 开始。**
+**个人仓库：[Charles-art36/IELTS-learning-assistant](https://github.com/Charles-art36/IELTS-learning-assistant)，默认 main。首次使用从 [START_HERE.md](START_HERE.md) 开始。**
 
 Next.js + FastAPI 的 IELTS Academic 学习原型。用户设置目标与时间，审核周计划，进行词汇、题目与写作练习，并将错误、碎片笔记和原文收藏积累为可检索的个人知识。
 

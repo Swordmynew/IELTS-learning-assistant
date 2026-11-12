@@ -26,7 +26,7 @@
   "url": "http://127.0.0.1:3000",
   "sqlite_migration": "0007 -> 0008 -> 0007 -> 0008 verified on disposable database",
   "base_commit": "1b9d3d1c23a007077bc1464acc112e2d3187bcdb",
-  "validation_scope": "Working-tree implementation on base_commit, before the ccy最新 delivery commit; documentation added after implementation validation.",
+  "validation_scope": "Implementation validated before the delivery commits; subsequent changes document the handover and personal repository main destination.",
   "manual_ui_demo": {
     "date": "2026-11-12",
     "mode": "isolated local offline preview",
@@ -50,5 +50,12 @@
     "documentation_links": "9 entry/guide Markdown files checked; 0 broken local links",
     "secret_scan": "157 tracked index files checked; no high-confidence token/private-key findings",
     "staged_content": "66 reviewed source, test, dependency and documentation files; databases/uploads/cache/tmp excluded"
+  },
+  "delivery_target": {
+    "repository": "https://github.com/Charles-art36/IELTS-learning-assistant",
+    "branch": "main",
+    "visibility": "private",
+    "upstream": "https://github.com/Swordmynew/IELTS-learning-assistant",
+    "history": "preserved"
   }
 }
