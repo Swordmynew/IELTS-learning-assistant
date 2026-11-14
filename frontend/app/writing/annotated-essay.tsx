@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "@/lib/i18n";
+
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 export type Annotation = {
@@ -42,6 +44,7 @@ function locate(text: string, item: Annotation) {
 export function AnnotatedEssay({ text, annotations, activeId, onSelect }: {
   text: string; annotations: Annotation[]; activeId?: string; onSelect: (id: string) => void;
 }) {
+  const { t } = useI18n();
   const root = useRef<HTMLDivElement>(null);
   const [positions, setPositions] = useState<{ id: string; top: number }[]>([]);
   const located = useMemo(() => annotations.flatMap(item => {
@@ -91,12 +94,12 @@ export function AnnotatedEssay({ text, annotations, activeId, onSelect }: {
       const stripes = !active && criteria.length > 1 ? `linear-gradient(to bottom, ${criteria.map((criterion, index) => `var(--${criterion}-soft) ${index / criteria.length * 100}% ${(index + 1) / criteria.length * 100}%`).join(", ")})` : undefined;
       return <mark key={start} data-annotations={items.map(item => item.id).join(" ")} data-criterion={(active ?? items[0]).criterion} data-criteria={criteria.join(" ")} className={active ? "active" : ""} style={{ backgroundImage: stripes }}>{text.slice(start, end)}</mark>;
     })}</div>
-    <div className="essay-annotation-rail" aria-label="正文批注">{groups.map(group => {
+    <div className="essay-annotation-rail" aria-label={t("ui.essayAnnotations")}>{groups.map(group => {
       const index = annotations.findIndex(note => note.id === group.ids[0]);
       const note = annotations[index];
       const active = !!activeId && group.ids.includes(activeId);
       const criterion = (active ? annotations.find(item => item.id === activeId) : note)?.criterion;
-      return <button key={note.id} type="button" data-criterion={criterion} className={`essay-note-marker ${active ? "active" : ""}`} style={{ top: group.top, right: 0 }} aria-label={`批注 ${index + 1} · ${note.label}`} title={group.ids.length > 1 ? `${group.ids.length} 条批注` : note.label} aria-pressed={active} aria-controls="writing-annotation-detail" onClick={() => onSelect(note.id)}>{index + 1}{group.ids.length > 1 && <small>+{group.ids.length - 1}</small>}</button>;
+      return <button key={note.id} type="button" data-criterion={criterion} className={`essay-note-marker ${active ? "active" : ""}`} style={{ top: group.top, right: 0 }} aria-label={t("ui.annotationValueValue", { value1: index + 1, value2: note.label })} title={group.ids.length > 1 ? t("ui.valueAnnotations", { value1: group.ids.length }) : note.label} aria-pressed={active} aria-controls="writing-annotation-detail" onClick={() => onSelect(note.id)}>{index + 1}{group.ids.length > 1 && <small>+{group.ids.length - 1}</small>}</button>;
     })}</div>
   </div>;
 }

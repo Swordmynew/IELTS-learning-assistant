@@ -4,6 +4,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from "react";
 
 import { api, UserAccount } from "@/lib/api";
+import { I18nProvider } from "@/lib/i18n";
+import { ThemeProvider } from "@/lib/theme";
 
 type AuthSession = {
   token: string | null;
@@ -137,7 +139,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   }), [token, user, loading, error, login, register, enterDemo, logout, refreshUser]);
   return (
     <QueryClientProvider client={client}>
-      <AuthSessionContext.Provider value={session}>{children}</AuthSessionContext.Provider>
+      <ThemeProvider><I18nProvider><AuthSessionContext.Provider value={session}>{children}</AuthSessionContext.Provider></I18nProvider></ThemeProvider>
     </QueryClientProvider>
   );
 }

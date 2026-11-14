@@ -1,3 +1,5 @@
+import { localizeError, translate } from "./i18n";
+
 export type Skill = "listening" | "reading" | "writing" | "speaking";
 export type PlanSkill = Skill | "vocabulary";
 
@@ -191,7 +193,7 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
   });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(typeof payload.detail === "string" ? payload.detail : JSON.stringify(payload.detail));
+    throw new Error(localizeError(typeof payload.detail === "string" ? payload.detail : JSON.stringify(payload.detail)));
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
@@ -203,7 +205,7 @@ export async function generatePlanStream(token: string, onProgress: (event: Plan
   const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "/api/v1"}/agent/runs/stream`, {
     method: "POST", headers: { Authorization: `Bearer ${token}`, "Idempotency-Key": crypto.randomUUID() },
   });
-  if (!response.ok || !response.body) throw new Error("规划连接失败，请重试");
+  if (!response.ok || !response.body) throw new Error(translate("error.planConnection"));
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -218,14 +220,14 @@ export async function generatePlanStream(token: string, onProgress: (event: Plan
         const data = frame.split("\n").filter(line => line.startsWith("data:")).map(line => line.slice(5).trim()).join("\n");
         if (!data) continue;
         const event = JSON.parse(data) as PlanningProgress & { detail?: string; plan?: StudyPlan };
-        if (event.status === "failed") throw new Error(event.detail ?? "规划执行失败，请重新生成");
+        if (event.status === "failed") throw new Error(event.detail ? localizeError(event.detail) : translate("error.planFailed"));
         onProgress(event);
         if (event.status === "completed" && event.plan && event.plan.id === event.plan_id) result = event.plan;
       }
       if (done) break;
     }
   } finally { await reader.cancel().catch(() => undefined); reader.releaseLock(); }
-  if (!result) throw new Error("规划连接已中断，请重新生成");
+  if (!result) throw new Error(translate("error.planInterrupted"));
   return result;
 }
 

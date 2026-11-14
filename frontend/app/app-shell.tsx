@@ -17,30 +17,33 @@ import {
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
+import { localizeError, useI18n } from "@/lib/i18n";
 
 import { useAuth } from "./providers";
 import { TutorProvider } from "./floating-tutor";
+import { AppearanceControls } from "./appearance-controls";
 
 const links = [
-  { href: "/", label: "学习概览", icon: Gauge },
-  { href: "/profile", label: "学习档案", icon: UserRound },
-  { href: "/plan", label: "本周计划", icon: CalendarDays },
-  { href: "/vocabulary", label: "背单词", icon: BookOpenCheck },
-  { href: "/question-bank", label: "练习题库", icon: LibraryBig },
-  { href: "/resources", label: "个人知识库", icon: FolderOpen },
-  { href: "/writing", label: "写作工作台", icon: FilePenLine },
+  { href: "/", label: "shell.overview", icon: Gauge },
+  { href: "/profile", label: "shell.profile", icon: UserRound },
+  { href: "/plan", label: "shell.plan", icon: CalendarDays },
+  { href: "/vocabulary", label: "shell.vocabulary", icon: BookOpenCheck },
+  { href: "/question-bank", label: "shell.questions", icon: LibraryBig },
+  { href: "/resources", label: "shell.resources", icon: FolderOpen },
+  { href: "/writing", label: "shell.writing", icon: FilePenLine },
 ];
 
 export function AppShell({ children }: { children: React.ReactNode }) {
+  const { t } = useI18n();
   const pathname = usePathname();
   const router = useRouter();
   const { user, loading, error, logout } = useAuth();
   const [open, setOpen] = useState(false);
   const isAuthPage = pathname === "/login" || pathname === "/register";
 
-  if (isAuthPage) return <div className="auth-shell">{children}</div>;
+  if (isAuthPage) return <div className="auth-shell"><header className="auth-preferences"><AppearanceControls /></header>{children}</div>;
 
-  const displayName = user?.display_name || user?.email.split("@")[0] || "学习者";
+  const displayName = user?.display_name || user?.email.split("@")[0] || t("shell.learner");
   const initial = displayName.slice(0, 1).toUpperCase();
   const signOut = () => { logout(); router.replace("/login"); };
 
@@ -49,14 +52,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       <aside className={`sidebar ${open ? "open" : ""}`}>
         <div className="brand-lockup">
           <span className="brand-mark">IA</span>
-          <div><strong>IELTS Coach</strong><small>自适应学习助手</small></div>
+          <div><strong>IELTS Coach</strong><small>{t("shell.subtitle")}</small></div>
         </div>
-        <nav className="side-nav" aria-label="主要功能">
+        <nav className="side-nav" aria-label={t("shell.navigation")}>
           {links.map(({ href, label, icon: Icon }) => {
             const active = href === "/" ? pathname === href : pathname.startsWith(href);
             return (
               <Link key={href} href={href} className={active ? "active" : ""} onClick={() => setOpen(false)}>
-                <Icon size={19} />{label}
+                <Icon size={19} />{t(label)}
               </Link>
             );
           })}
@@ -64,24 +67,25 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="sidebar-account">
           <Link href="/account" className="account-summary" onClick={() => setOpen(false)}>
             <span className="account-avatar">{initial}</span>
-            <span><strong>{displayName}</strong><small>{user?.demo ? "演示账号" : user?.email}</small></span>
+            <span><strong>{displayName}</strong><small>{user?.demo ? t("shell.demo") : user?.email}</small></span>
           </Link>
           <div className="account-actions">
-            <Link href="/settings" onClick={() => setOpen(false)}><Settings size={16} />设置</Link>
-            <button onClick={signOut}><LogOut size={16} />退出</button>
+            <Link href="/settings" onClick={() => setOpen(false)}><Settings size={16} />{t("shell.settings")}</Link>
+            <button onClick={signOut}><LogOut size={16} />{t("shell.logout")}</button>
           </div>
+          <AppearanceControls />
           <div className="sidebar-footer">
             <span className={`connection-dot ${error ? "error" : ""}`} />
-            {loading ? "连接中…" : error ? "连接失败" : "已同步"}
+            {loading ? t("shell.connecting") : error ? t("shell.connectionFailed") : t("shell.synced")}
           </div>
         </div>
       </aside>
-      {open && <button className="nav-backdrop" aria-label="关闭导航" onClick={() => setOpen(false)} />}
+      {open && <button className="nav-backdrop" aria-label={t("shell.closeNavigation")} onClick={() => setOpen(false)} />}
       <div className="app-content">
         <header className="mobile-header">
-          <button aria-label="打开导航" onClick={() => setOpen(!open)}>{open ? <X /> : <Menu />}</button>
+          <button aria-label={t(open ? "shell.closeNavigation" : "shell.openNavigation")} onClick={() => setOpen(!open)}>{open ? <X /> : <Menu />}</button>
           <strong>IELTS Coach</strong>
-          <Link className="mobile-account" href="/account" aria-label="用户中心"><CircleUserRound size={21} /></Link>
+          <Link className="mobile-account" href="/account" aria-label={t("shell.account")}><CircleUserRound size={21} /></Link>
         </header>
         {children}
       </div>
@@ -104,14 +108,15 @@ export function PageHeader({ eyebrow, title, description, action }: {
 }
 
 export function SessionGate({ children }: { children: React.ReactNode }) {
+  const { t } = useI18n();
   const { token, loading, error } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
   useEffect(() => {
     if (!loading && !token) router.replace(`/login?next=${encodeURIComponent(pathname)}`);
   }, [loading, pathname, router, token]);
-  if (loading) return <main className="page loading-state">正在准备学习空间…</main>;
-  if (error) return <main className="page loading-state error-text">登录状态校验失败：{error}</main>;
-  if (!token) return <main className="page loading-state">正在前往登录页面…</main>;
+  if (loading) return <main className="page loading-state">{t("shell.preparing")}</main>;
+  if (error) return <main className="page loading-state error-text">{t("shell.sessionFailed", { error: localizeError(error) })}</main>;
+  if (!token) return <main className="page loading-state">{t("shell.redirecting")}</main>;
   return <>{children}</>;
 }

@@ -5,16 +5,51 @@ import re
 
 from app.config import get_settings
 
-FOLLOWUP = re.compile(r"上次|刚才|这个|那个|这条|那条|那种|这类|它|继续|再举|再解释|举个例子|\b(?:that|those|it|previous|again|more examples|explain further)\b", re.I)
+EXERCISE_FOLLOWUP = re.compile(r"[这那](?:[一二两三四五六七八九十几\d]+)?(?:道|个)?题|\b(?:these|those|that) (?:two |three )?(?:questions?|exercises?)\b", re.I)
+FOLLOWUP = re.compile(r"上次|刚才|这个|那个|这条|那条|那种|这类|它|继续|再举|再解释|举个例子|" + EXERCISE_FOLLOWUP.pattern + r"|\b(?:that|those|it|previous|again|more examples|explain further)\b", re.I)
+
+
+def vocabulary_writing_intent(question: str) -> bool:
+    """A narrow bilingual bridge, not permission to retrieve arbitrary personal records."""
+    return all(re.search(pattern, question, re.I) for pattern in (
+        r"我的|我在|\bmy\b", r"词汇|单词|用词|\b(?:vocabulary|words?|lexical)\b",
+        r"错误|错词|用错|\b(?:mistakes?|errors?|misuse)\b", r"写作|作文|\b(?:writing|essays?)\b",
+    ))
+
+
+def bilingual_search_question(question: str) -> str:
+    if not vocabulary_writing_intent(question):
+        return question
+    return question + " 词汇 单词 错误 写作 作文 vocabulary word errors writing lexical grammar"
+
+
+def followup_source_ids(question: str, history: list[dict]) -> list[str]:
+    if not EXERCISE_FOLLOWUP.search(question):
+        return []
+    for message in reversed(history):
+        if message.get("mode") not in (None, "live", "cache"):
+            continue
+        sources = [citation["source_id"] for citation in message.get("citations", [])
+                   if citation.get("source_type") == "mistake" and citation.get("source_id")]
+        if sources:
+            return list(dict.fromkeys(sources))[:10]
+    return []
 
 
 def retrieval_question(question: str, history: list[dict]) -> str:
     if not history or not FOLLOWUP.search(question):
         return question
-    previous = history[-1]
+    previous = next((message for message in reversed(history)
+                     if message.get("mode") not in ("offline", "insufficient")), history[-1])
     anchor = previous.get("query", "")[:400]
-    titles = " ".join(citation.get("title", "") for citation in previous.get("citations", [])[:2])[:200]
-    extra = f"{anchor} {titles}".strip()
+    focused = set(followup_source_ids(question, history))
+    references = previous.get("citations", [])
+    if focused:
+        references = [citation for message in history for citation in message.get("citations", [])
+                      if citation.get("source_id") in focused]
+    titles = " ".join(dict.fromkeys(citation.get("title", "") for citation in references))[:600]
+    # Old queries and titles locate current records; obsolete answers are never reused as evidence.
+    extra = f"{titles} {anchor}".strip()
     return f"{question} {extra[:max(0, 1999 - len(question))]}".strip()
 
 

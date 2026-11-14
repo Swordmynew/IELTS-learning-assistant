@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n, localizeError } from "@/lib/i18n";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { CheckCircle2, FileText, FileUp, FolderOpen } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -17,6 +19,7 @@ export default function ResourcesPage() {
 }
 
 function ResourcesContent() {
+  const { t } = useI18n();
   const { token } = useDemoSession();
   const client = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
@@ -37,21 +40,21 @@ function ResourcesContent() {
   });
 
   return <main className="page resources-page">
-    <PageHeader title="个人知识库" />
-    <div className="coach-version-tabs"><button className={tab === "personal" ? "active" : ""} onClick={() => setTab("personal")}>个人积累</button><button className={tab === "documents" ? "active" : ""} onClick={() => setTab("documents")}>资料与笔记</button></div>
+    <PageHeader title={t("ui.knowledgeLibrary")} />
+    <div className="coach-version-tabs"><button className={tab === "personal" ? "active" : ""} onClick={() => setTab("personal")}>{t("ui.myLearning")}</button><button className={tab === "documents" ? "active" : ""} onClick={() => setTab("documents")}>{t("ui.documentsAndNotes")}</button></div>
     {tab === "personal" ? <PersonalKnowledge token={token!} /> : <>
     <div className="resource-layout">
-      <details className="panel upload-disclosure"><summary><FileUp size={19} />上传笔记</summary><div className="upload-zone">
-        <p>TXT · Markdown · PDF · DOCX</p>
-        <label className="file-picker"><input type="file" accept=".pdf,.docx,.txt,.md" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /><span>{file ? file.name : "选择文件"}</span></label>
-        <button className="primary-button full-button" onClick={() => upload.mutate()} disabled={!file || upload.isPending}>{upload.isPending ? "正在上传…" : "上传"}</button>
-        {upload.error && <p className="error-text">上传失败：{upload.error.message}</p>}
-        <Link href="/question-bank/new" className="coach-bank-link">录入练习题 →</Link>
+      <details className="panel upload-disclosure"><summary><FileUp size={19} />{t("ui.uploadNotes")}</summary><div className="upload-zone">
+        <p>{t("ui.txtMarkdownPdfDocx")}</p>
+        <label className="file-picker"><input type="file" accept=".pdf,.docx,.txt,.md" onChange={(event) => setFile(event.target.files?.[0] ?? null)} /><span>{file ? file.name : t("ui.chooseFile")}</span></label>
+        <button className="primary-button full-button" onClick={() => upload.mutate()} disabled={!file || upload.isPending}>{upload.isPending ? t("ui.uploading") : t("ui.upload")}</button>
+        {upload.error && <p className="error-text">{t("common.errorUploading", { error: localizeError(upload.error.message) })}</p>}
+        <Link href="/question-bank/new" className="coach-bank-link">{t("ui.addPracticeQuestions")}</Link>
       </div></details>
       <section className="panel document-panel">
-        <div className="panel-heading"><div><p className="eyebrow">资料</p><h2>{documents.data?.length ?? 0} 份文档</h2></div><FolderOpen /></div>
-        <div className="document-list">{documents.isLoading ? <p>正在读取…</p> : documents.data?.map((document) => <article key={document.id}>
-          <input type="checkbox" aria-label={`选择资料 ${document.title}`} disabled={document.status !== "completed"} checked={documentIds.includes(document.id)} onChange={event => setDocumentIds(ids => event.target.checked ? [...ids, document.id] : ids.filter(id => id !== document.id))} /><div className="document-icon"><FileText /></div><div><strong>{document.title}</strong><span>{document.filename}</span><small>{document.is_private ? "私人资料" : "项目公共资料"}</small>{document.error && <em>{document.error}</em>}{document.status === "completed" && <button className="document-read-button" onClick={() => setViewing({ id: document.id })}>查看原文</button>}</div><span className={`document-status ${document.status}`}>{document.status === "completed" ? <><CheckCircle2 />可检索</> : document.status === "failed" ? "处理失败" : "处理中"}</span>
+        <div className="panel-heading"><div><p className="eyebrow">{t("ui.documents")}</p><h2>{t("document.documentCount", { count: documents.data?.length ?? 0 })}</h2></div><FolderOpen /></div>
+        <div className="document-list">{documents.isLoading ? <p>{t("common.readingContent")}</p> : documents.data?.map((document) => <article key={document.id}>
+          <input type="checkbox" aria-label={t("ui.selectDocumentValue", { value1: document.title })} disabled={document.status !== "completed"} checked={documentIds.includes(document.id)} onChange={event => setDocumentIds(ids => event.target.checked ? [...ids, document.id] : ids.filter(id => id !== document.id))} /><div className="document-icon"><FileText /></div><div><strong>{document.title}</strong><span>{document.filename}</span><small>{document.is_private ? t("ui.privateDocument") : t("ui.projectReferenceMaterial")}</small>{document.error && <em>{localizeError(document.error)}</em>}{document.status === "completed" && <button className="document-read-button" onClick={() => setViewing({ id: document.id })}>{t("ui.showTranscript")}</button>}</div><span className={`document-status ${document.status}`}>{document.status === "completed" ? <><CheckCircle2 />{t("ui.searchable")}</> : document.status === "failed" ? t("ui.processingFailed") : t("ui.processing")}</span>
         </article>)}</div>
       </section>
     </div>

@@ -297,6 +297,10 @@ class RagQuery(BaseModel):
 
 
 class RagAnswer(BaseModel):
+    system_message_key: str | None = None
+    generation_mode: str | None = None
+    retrieved_sources: list[Citation] = Field(default_factory=list)
+    failure_reason: str | None = None
     retrieval_query: str | None = None
     evidence_chars: int = 0
     query: str

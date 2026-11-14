@@ -102,7 +102,8 @@ async def invalidate_memory(session: AsyncSession, user_id: str, item_ids: set[s
 
 
 def usable_history(messages: list[dict]) -> list[dict]:
-    return [message for message in messages if not message.get("context_stale")][-6:]
+    return [message for message in messages
+            if not message.get("context_stale") and message.get("mode") in (None, "live", "cache")][-6:]
 
 
 async def record_event(

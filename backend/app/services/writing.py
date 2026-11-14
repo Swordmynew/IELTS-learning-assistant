@@ -18,7 +18,7 @@ from app.schemas import (
     WritingAssessment,
     WritingSubmission,
 )
-from app.services.coach_prompts import COACH_VOICE
+from app.services.coach_prompts import COACH_VOICE, reply_language_instruction
 from app.services.rag import retrieve_official_rubric
 
 
@@ -237,13 +237,14 @@ class OpenAIWritingGrader(WritingGrader):
         prompt = (
             "You are an IELTS Academic writing tutor. Give direct, practical learning feedback. "
             "Assess the essay against the supplied rubric summaries. Every criterion must quote "
-            "an exact span from the essay and cite at least one supplied source. Return Chinese feedback.\n\n"
+            "an exact span from the essay and cite at least one supplied source. Reply in the language of the user's request.\n\n"
             f"Task type: {submission.task_type.value}\nPrompt: {submission.prompt}\nEssay:\n{submission.essay}\n\n"
             f"Rubric evidence:\n{json.dumps([item.model_dump() for item in citations], ensure_ascii=False)}"
         )
         response = await self.client.responses.create(
             model=self.model,
-            instructions="Return only schema-valid data. " + COACH_VOICE,
+            instructions="Return only schema-valid data. " + COACH_VOICE + "\n"
+            + reply_language_instruction({"prompt": submission.prompt}),
             input=prompt,
             text={
                 "format": {

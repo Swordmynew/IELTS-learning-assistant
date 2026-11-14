@@ -10,7 +10,7 @@ from app.coach_schemas import TutorAnswer
 from app.config import get_settings
 from app.db import CoachRecord, KnowledgeChunkRow, KnowledgeDocumentRow
 from app.schemas import Citation, RagAnswer, RagQuery
-from app.services.coach_model import generate
+from app.services.coach_model import generate, generation_failure_message
 from app.services.coach_prompts import TUTOR_GROUNDING
 from app.services.embeddings import embed_text
 from app.services.learning_memory import (
@@ -24,11 +24,16 @@ from app.services.learning_memory import (
 )
 from app.services.rag import SearchHit, keyword_rank, reciprocal_rank_fusion, to_citation
 from app.services.retrieval_context import (
+    EXERCISE_FOLLOWUP,
+    bilingual_search_question,
     bounded_history,
     evidence_window,
+    followup_source_ids,
     pack_evidence,
     retrieval_question,
+    vocabulary_writing_intent,
 )
+from app.services.tutor_citations import render_tutor_answer, validate_tutor_answer
 
 
 def _cosine(left: list[float], right: list[float]) -> float:
@@ -126,8 +131,10 @@ async def _postgres_search(
     ]
 
 
-async def retrieve_sources(session: AsyncSession, user_id: str, query: RagQuery):
-    vector, model = await embed_text(query.query, get_settings())
+async def retrieve_sources(session: AsyncSession, user_id: str, query: RagQuery, *, focus_source_ids: list[str] | None = None):
+    search_text = bilingual_search_question(query.query)
+    personal_intent = vocabulary_writing_intent(query.query)
+    vector, model = await embed_text(search_text, get_settings())
     rows = (
         await session.execute(
             select(KnowledgeChunkRow, KnowledgeDocumentRow)
@@ -216,17 +223,33 @@ async def retrieve_sources(session: AsyncSession, user_id: str, query: RagQuery)
                 "page": data.get("page"),
                 "recorded_at": data.get("updated_at"),
             }
+    focused = set(focus_source_ids or [])
+    if focused:
+        current_focus = focused.intersection(hit.chunk_id for hit in hits)
+        if not current_focus:
+            return [], [], model
+        # Previous IDs identify exercises, not old facts. Only current, owner-scoped records survive.
+        hits = [hit for hit in hits if hit.chunk_id in current_focus or details[hit.chunk_id]["source_type"] == "public"]
     dense = sorted((hit for hit in hits if hit.score > 0.1), key=lambda hit: hit.score, reverse=True)[:20]
-    sparse = keyword_rank(query.query, hits)[:20]
+    sparse = keyword_rank(search_text, hits)[:20]
     tag_hits = sorted(
         (hit for hit in hits if query_topics.intersection(details[hit.chunk_id].get("topic_tags", []))),
         key=lambda hit: hit.score, reverse=True,
     )[:20]
-    seed_ids = {hit.chunk_id for hit in [*sparse[:10], *dense[:10], *tag_hits[:10]]}
+    lexical_topics = {"writing.vocabulary", "writing.grammar", "grammar.countability", "lexical.collocation", "lexical.meaning"}
+    intent_hits = [hit for hit in hits if personal_intent and not focused and (
+        (details[hit.chunk_id]["source_type"] == "vocabulary"
+         and details[hit.chunk_id].get("memory_stats", {}).get("mistake_count", 0) > 0)
+        or (details[hit.chunk_id]["source_type"] == "writing"
+            and lexical_topics.intersection(details[hit.chunk_id].get("topic_tags", [])))
+    )]
+    intent_hits.sort(key=lambda hit: (details[hit.chunk_id].get("memory_stats", {}).get("mistake_count", 0), hit.score), reverse=True)
+    seed_ids = {hit.chunk_id for hit in [*sparse[:10], *dense[:10], *tag_hits[:10], *intent_hits[:10]]}
     related_targets = {related for item in seed_ids for related in details[item].get("related_ids", [])}
     linked = [hit for hit in hits if hit.chunk_id in related_targets or seed_ids.intersection(details[hit.chunk_id].get("related_ids", []))]
     linked_ids = {hit.chunk_id for hit in linked}
-    fused = reciprocal_rank_fusion([dense, sparse, *([tag_hits] if tag_hits else []), *([linked] if linked else [])], limit=30)
+    focus_hits = [hit for hit in hits if hit.chunk_id in focused]
+    fused = reciprocal_rank_fusion([dense, sparse, *([intent_hits] if intent_hits else []), *([focus_hits] if focus_hits else []), *([tag_hits] if tag_hits else []), *([linked] if linked else [])], limit=30)
     dense_ids, sparse_ids = {hit.chunk_id for hit in dense}, {hit.chunk_id for hit in sparse}
     adjusted = []
     for hit in fused:
@@ -255,12 +278,30 @@ async def retrieve_sources(session: AsyncSession, user_id: str, query: RagQuery)
             reasons.append("最近已改善")
         detail["match_reasons"] = reasons
         adjusted.append((hit.score * factor, hit))
-    adjusted.sort(key=lambda item: item[0], reverse=True)
+    adjusted.sort(key=lambda item: (item[1].chunk_id in focused, item[0]), reverse=True)
     selected = adjusted[:query.limit]
     # Retain a relevant public explanation when mixing personal memories and reference material.
     public = next((item for item in adjusted if details[item[1].chunk_id]["source_type"] == "public"), None)
     if query.source_type == "all" and query.limit >= 3 and public and not any(details[item[1].chunk_id]["source_type"] == "public" for item in selected):
         selected[-1:] = [public]
+    # A vocabulary-to-writing question needs both sides when relevant records exist.
+    if personal_intent and not focused and query.limit >= 3:
+        protected = set()
+        for kind in ("vocabulary", "writing"):
+            candidate = next((item for item in adjusted if item[1] in intent_hits
+                              and details[item[1].chunk_id]["source_type"] == kind), None)
+            if not candidate:
+                continue
+            if candidate not in selected:
+                if len(selected) < query.limit:
+                    selected.append(candidate)
+                else:
+                    index = next((i for i in range(len(selected) - 1, -1, -1)
+                                  if selected[i][1].chunk_id not in protected
+                                  and details[selected[i][1].chunk_id]["source_type"] != "public"), None)
+                    if index is not None:
+                        selected[index] = candidate
+            protected.add(candidate[1].chunk_id)
     maximum = max((score for score, _ in adjusted), default=1.0)
     ranked = [SearchHit(hit.chunk_id, hit.title, hit.content, hit.source_url, hit.page, round(score / maximum, 4)) for score, hit in selected]
     citations = [
@@ -276,6 +317,7 @@ async def retrieve_sources(session: AsyncSession, user_id: str, query: RagQuery)
 async def hybrid_search(session: AsyncSession, user_id: str, query: RagQuery) -> RagAnswer:
     conversation = None
     history = []
+    reference_history = []
     scope = {
         "source_type": query.source_type,
         "document_ids": sorted(query.document_ids),
@@ -301,25 +343,32 @@ async def hybrid_search(session: AsyncSession, user_id: str, query: RagQuery) ->
             from fastapi import HTTPException
 
             raise HTTPException(409, "Start a new conversation after changing source filters")
-        history = usable_history(conversation.payload.get("messages", []))
+        reference_history = conversation.payload.get("messages", [])
+        history = usable_history(reference_history)
     else:
         conversation = CoachRecord(user_id=user_id, kind="conversation", payload={"messages": []})
         session.add(conversation)
         await session.flush()
-    search_query = query.model_copy(update={"query": retrieval_question(query.query, history)})
-    citations, ranked, model = await retrieve_sources(session, user_id, search_query)
+    focused = followup_source_ids(query.query, reference_history)
+    unresolved_reference = bool(EXERCISE_FOLLOWUP.search(query.query)) and not focused
+    search_query = query.model_copy(update={"query": retrieval_question(query.query, reference_history)})
+    if unresolved_reference:
+        citations, ranked, model = [], [], "not-requested"
+    else:
+        citations, ranked, model = await retrieve_sources(session, user_id, search_query, focus_source_ids=focused or None)
     mode = f"portable-vector+keyword+rrf ({model})"
     citations, evidence = pack_evidence(citations, ranked, query.query)
-    answer = "当前知识库证据不足以回答该问题。"
+    answer = "你指的是哪几道题？请提供题目关键词，或回到讨论这些题目的原对话继续。" if unresolved_reference else "当前知识库证据不足以回答该问题。"
     result_mode, generated_at = "insufficient", None
+    failure_reason = None
+    system_message_key = "rag.whichExercises" if unresolved_reference else "rag.noRelatedRecords"
+    generation_mode = None
+    retrieved_sources = []
     if citations:
-        allowed = {item.source_id for item in citations}
-
         def validate(result: TutorAnswer) -> TutorAnswer:
-            if set(result.source_ids) - allowed or (result.sufficient and not result.source_ids):
-                raise ValueError("Invalid citations")
-            return result
+            return validate_tutor_answer(result, citations)
 
+        failure = {}
         result = await generate(
             session,
             user_id,
@@ -328,24 +377,33 @@ async def hybrid_search(session: AsyncSession, user_id: str, query: RagQuery) ->
                 "question": query.query,
                 "history": bounded_history(history),
                 "sources": evidence,
+                **({"reference_focus_ids": focused} if focused else {}),
             },
             TutorAnswer,
             TUTOR_GROUNDING,
             validate,
+            failure=failure,
         )
         if result:
             parsed = TutorAnswer.model_validate(result.data)
             if parsed.sufficient:
-                answer = parsed.answer
+                answer = render_tutor_answer(parsed, citations)
                 citations = [item for item in citations if item.source_id in parsed.source_ids]
+                system_message_key = None
+                result_mode = result.mode
             else:
+                retrieved_sources = citations
                 citations = []
-            result_mode, generated_at = result.mode, result.generated_at
+                system_message_key = "rag.insufficientEvidence"
+                result_mode = "insufficient"
+            generation_mode, generated_at = result.mode, result.generated_at
         else:
             # A memory edit may have invalidated an in-flight model request; refresh its sources.
-            citations, ranked, model = await retrieve_sources(session, user_id, search_query)
-            answer = "模型暂不可用。以下为检索到的资料；可打开独立离线示例。" if citations else "当前知识库证据不足以回答该问题。"
+            citations, ranked, model = await retrieve_sources(session, user_id, search_query, focus_source_ids=focused or None)
+            failure_reason = failure.get("reason", "generation_failed")
+            answer = generation_failure_message(failure_reason) + "以下仅展示检索到的资料。" if citations else "当前知识库证据不足以回答该问题。"
             result_mode = "offline" if citations else "insufficient"
+            system_message_key = None if citations else "rag.noRelatedRecords"
     messages = [
         *conversation.payload.get("messages", []),
         {
@@ -354,6 +412,10 @@ async def hybrid_search(session: AsyncSession, user_id: str, query: RagQuery) ->
             "answer": answer,
             "citations": [c.model_dump() for c in citations],
             "mode": result_mode,
+            "failure_reason": failure_reason,
+            "system_message_key": system_message_key,
+            "generation_mode": generation_mode,
+            "retrieved_sources": [source.model_dump() for source in retrieved_sources],
             "generated_at": generated_at,
         },
     ]
@@ -367,6 +429,10 @@ async def hybrid_search(session: AsyncSession, user_id: str, query: RagQuery) ->
         citations=citations,
         retrieval_mode=mode,
         mode=result_mode,
+        failure_reason=failure_reason,
+        system_message_key=system_message_key,
+        generation_mode=generation_mode,
+        retrieved_sources=retrieved_sources,
         generated_at=generated_at,
         conversation_id=conversation.id,
     )

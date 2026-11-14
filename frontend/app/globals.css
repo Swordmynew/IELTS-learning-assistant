@@ -29,9 +29,12 @@ button:disabled { cursor:not-allowed; opacity:.58; }
 .account-summary strong,.account-summary small { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
 .account-summary strong { color:#eef4f0; font-size:13px; }
 .account-summary small { margin-top:2px; color:#91a49a; font-size:10px; }
-.account-actions { display:grid; grid-template-columns:1fr 1fr; gap:4px; margin-top:7px; }
+.account-actions { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:4px; margin-top:7px; }
 .account-actions a,.account-actions button { min-height:32px; display:flex; align-items:center; justify-content:center; gap:5px; border:0; border-radius:7px; color:#9db0a6; background:transparent; font-size:11px; }
 .account-actions a:hover,.account-actions button:hover { color:#fff; background:rgba(255,255,255,.06); }
+.account-actions>a,.account-actions>button { padding:0 2px; white-space:nowrap; }
+.account-actions svg { flex-shrink:0; }
+.account-actions button:focus-visible,.account-actions a:focus-visible { outline:2px solid #82c79f; outline-offset:2px; }
 .sidebar-footer { display:flex; align-items:center; gap:8px; margin-top:9px; padding:10px 7px 0; border-top:1px solid rgba(255,255,255,.07); color:#82978c; font-size:10px; }
 .connection-dot { width:7px; height:7px; border-radius:50%; background:#5fd091; box-shadow:0 0 0 4px rgba(95,208,145,.12); }
 .connection-dot.error { background:#ef776d; }

@@ -1,0 +1,71 @@
+/* Shared preferences, separate from account actions on both auth and study pages. */
+:root { color-scheme:light; }
+.appearance-controls { position:relative; display:flex; align-items:center; justify-content:space-between; gap:10px; }
+.appearance-controls button { display:inline-flex; align-items:center; justify-content:center; gap:6px; min-height:34px; padding:0 8px; border:1px solid transparent; border-radius:7px; color:var(--muted); background:transparent; font-size:12px; white-space:nowrap; }
+.appearance-controls button:hover { color:var(--ink); background:var(--green-soft); }
+.appearance-controls button:focus-visible { outline:2px solid var(--green); outline-offset:2px; }
+.language-control { min-width:0; }
+.language-menu { position:absolute; bottom:calc(100% + 8px); right:0; z-index:40; width:180px; padding:5px; border:1px solid var(--line); border-radius:10px; color:var(--ink); background:var(--card); box-shadow:var(--shadow); }
+.appearance-controls .language-menu button { width:100%; justify-content:space-between; padding:9px 11px; color:inherit; }
+.appearance-controls .language-menu button[aria-checked="true"] { color:var(--green); background:var(--green-soft); }
+.theme-options { display:flex; flex:none; gap:2px; padding:2px; border:1px solid var(--line); border-radius:9px; }
+.theme-options .theme-option { width:30px; min-height:30px; padding:0; }
+.theme-options .theme-option[aria-pressed="true"] { color:var(--green); background:var(--green-soft); }
+.sidebar-account > .appearance-controls { margin-top:8px; padding-top:10px; border-top:1px solid #ffffff14; }
+.sidebar .appearance-controls { --ink:#eef4f0; --muted:#aebdb6; --line:#3c5146; --card:#20352a; --green:#b1e1c2; --green-soft:#2b5841; --shadow:0 8px 24px #0005; }
+.sidebar .appearance-controls > .language-control > button { padding:0 6px; }
+.auth-preferences { display:flex; align-items:center; justify-content:flex-end; min-height:64px; padding:10px clamp(20px,4vw,56px); border-bottom:1px solid var(--line); background:var(--card); }
+.auth-preferences .appearance-controls { gap:20px; }
+.auth-preferences .language-menu { top:calc(100% + 8px); bottom:auto; }
+.auth-shell .auth-page,.auth-shell .auth-intro { min-height:calc(100dvh - 64px); }
+
+/* Retain the existing forest-green identity with a complete dark reading palette. */
+:root[data-theme="dark"] {
+  color-scheme:dark;
+  --ink:#e5eee8; --muted:#a4b5aa; --line:#36483e; --paper:#121b17; --card:#1b2821;
+  --green:#8fd3ae; --green-dark:#70bc94; --green-soft:#253e30; --orange:#f59b78; --red:#ffaaa0;
+  --shadow:0 16px 40px rgba(0,0,0,.2);
+  --surface-soft:#22322a; --surface-hover:#2b4033;
+  --text-secondary:#bdcbc2; --success-bg:#203e2d; --success-ink:#a1dfb9;
+  --warning-bg:#3d3220; --warning-ink:#f1cf8b; --error-bg:#402a29; --error-ink:#ffb3aa;
+  --purple-bg:#322c44; --purple-ink:#d0b9f0; --accent-fill:#276d4c; --accent-hover:#307f59;
+}
+[data-theme="dark"] :is(input,textarea,select) { accent-color:var(--green); }
+[data-theme="dark"] :is(input:not([type="checkbox"]):not([type="radio"]),textarea,select) { color:var(--ink); background-color:var(--card); border-color:var(--line); }
+[data-theme="dark"] ::placeholder { color:#96aa9c; opacity:1; }
+[data-theme="dark"] :is(.auth-shell,.day-column,.reading-passage,.coach-paper) { background:var(--paper); }
+[data-theme="dark"] :is(.auth-card,.demo-entry,.secondary-button,.metric-card,.day-column>header,.plan-task,.practice-overview article,.mode-tabs button,.type-filter,.audio-controls select,.coach-icon-button,.coach-version-tabs button,.coach-filter-tabs button,.coach-hint-tabs button,.coach-selection button,.coach-prompts button,.coach-empty button,.coach-empty-actions button,.word-stats>button,.word-study-complete button,.word-pagination button,.coach-writing-history>div,.minutes-grid label>div,.vocab-option-grid button) { background:var(--card); border-color:var(--line); }
+[data-theme="dark"] :where(.page,.coach-tutor) button:not([class]) { background:var(--card); }
+[data-theme="dark"] :is(.field,.auth-card form>label:not(.remember-row),.settings-form>label:not(.switch-setting),.preference-field legend,.reading-passage p,.answer-options label,.vocab-option-grid button,.vocab-study-focus,.transcript,.next-exercise p,.coach-previous p,.criteria-grid blockquote) { color:var(--text-secondary); }
+[data-theme="dark"] :is(.score-row.heading,.soft-note,.friendly-result-grid div,.bank-toolbar form button,.question-kind small,.document-status,.coach-criteria details,.coach-issue blockquote,.coach-sources blockquote,.coach-criteria blockquote,.coach-demo-memory article,.word-rating>button,.word-edit,.word-details blockquote,.task-actions button) { background:var(--surface-soft); }
+[data-theme="dark"] :is(.vocab-study-focus,.listening-note,.transcript,.answer-box,.file-picker,.coach-personal-note,.coach-user-message,.word-reveal,.vocab-option-grid b,.answer-options b) { background:var(--green-soft); }
+[data-theme="dark"] :is(.learning-path nav>a:hover,.vocab-option-grid button:hover,.answer-options label:hover,.answer-options label.selected,.word-launch .word-stats>button.active,.memory-tags button:hover) { background:var(--surface-hover); }
+[data-theme="dark"] :is(.auth-card,.auth-divider::before,.auth-divider::after,.auth-note,.demo-entry,.upcoming-task,.quick-actions>a,.score-row,.minutes-grid label>div,.preference-field label.selected,.plan-summary,.plan-task,.task-actions,.bank-toolbar form,.bank-toolbar form button,.question-item,.answer-options label,.file-picker,.document-list article,.criteria-grid blockquote,.switch-setting,.coach-editor>footer,.coach-knowledge-card footer,.coach-previous,.coach-issue,.coach-improvements>article,.coach-ai-message,.coach-chat-input,.coach-prompts button,.coach-sources details,.source-number,.coach-demo,.word-reveal,.word-details blockquote,.writing-word-grid blockquote,.coach-edit input,.coach-edit textarea) { border-color:var(--line); }
+[data-theme="dark"] .auth-divider::before,[data-theme="dark"] .auth-divider::after { background:var(--line); }
+[data-theme="dark"] :is(.primary-button,.auth-submit,.audio-button,.submit-answer,.step-number,.cefr-result,.large-avatar,.decision-buttons button:not(.secondary-button),.mode-tabs button.active,.word-rating .good,.tutor-launcher) { color:#f2fff7; background:var(--accent-fill); border-color:var(--accent-fill); }
+[data-theme="dark"] :is(.primary-button,.auth-submit,.audio-button,.submit-answer,.tutor-launcher):hover { background:var(--accent-hover); }
+[data-theme="dark"] .approve-button { color:#29160e; }
+[data-theme="dark"] .brand-mark { color:#29160e; }
+[data-theme="dark"] :is(.vocab-option-grid button.selected,.preference-field label.selected,.coach-writing-history button.active,.coach-version-tabs button.active,.coach-filter-tabs button.active,.coach-hint-tabs button.active) { color:var(--green); background:var(--green-soft); border-color:#548568; }
+[data-theme="dark"] :is(.skill-icon,.skill-tag,.status-pill,.coach-chip.live,.coach-chip.improved,.notice.success,.answer-result.correct,.account-status.success,.coach-quote-comparison ins) { color:var(--success-ink); background:var(--success-bg); }
+[data-theme="dark"] :is(.plan-summary,.task-actions button.restore-task) { color:var(--success-ink); background:var(--success-bg); }
+[data-theme="dark"] :is(.plan-summary.draft,.draft .status-pill,.notice.warning,.coach-hint,.coach-chip.pending,.coach-chip.partial,.coach-chip.cache,.account-status,.next-exercise,.skill-icon.writing,.skill-icon.speaking,.skill-tag.writing,.skill-tag.speaking,.word-rating .again) { color:var(--warning-ink); background:var(--warning-bg); }
+[data-theme="dark"] :is(.auth-error,.notice.error,.answer-result.incorrect,.coach-chip.remaining,.coach-quote-comparison del) { color:var(--error-ink); background:var(--error-bg); }
+[data-theme="dark"] :is(.skill-tag.vocabulary,.coach-chip.demo,.coach-chip.offline) { color:var(--purple-ink); background:var(--purple-bg); }
+[data-theme="dark"] .coach-chip:not(.live):not(.improved):not(.pending):not(.partial):not(.cache):not(.demo):not(.offline):not(.remaining) { color:#bfccdc; background:#2a3543; }
+[data-theme="dark"] :is(.coach-band>strong,.coach-goal,.coach-knowledge-card footer a,.next-exercise strong) { color:var(--green); }
+[data-theme="dark"] :is(.coach-prompt small,.coach-editor>footer>span,.coach-feedback>small,.coach-band small,.coach-knowledge-card small,.coach-knowledge-card summary,.coach-knowledge-source,.coach-knowledge-card footer button,.coach-ai-message>small,.coach-empty,.coach-chat-empty,.coach-source-footer,.metric-card span,.rest-day,.question-kind small,.auth-divider,.auth-note) { color:var(--muted); }
+[data-theme="dark"] .coach-tutor .text-button { color:var(--purple-ink); }
+[data-theme="dark"] .history-correct { color:var(--success-ink)!important; background:var(--success-bg)!important; }
+[data-theme="dark"] .history-wrong { color:var(--error-ink)!important; background:var(--error-bg)!important; }
+[data-theme="dark"] .capacity-track,[data-theme="dark"] .progress-track { background:var(--line); }
+[data-theme="dark"] .mobile-header { background:rgba(18,27,23,.94); }
+[data-theme="dark"] .switch-setting>input { background:var(--line); }
+[data-theme="dark"] .switch-setting>input:checked { background:var(--accent-fill); }
+[data-theme="dark"] .switch-setting>input::before { background:#e3eee6; }
+[data-theme="dark"] .settings-form input:disabled { color:var(--muted); background:var(--surface-soft); }
+@media (max-width:760px) {
+  .auth-shell .auth-intro { min-height:auto; }
+  .auth-shell .auth-page { min-height:calc(100dvh - 64px); padding-top:0; }
+  .auth-preferences { padding:10px 18px; }
+}

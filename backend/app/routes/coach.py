@@ -7,7 +7,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.auth import current_user
 from app.coach_schemas import (
     CoachQuestion,
-    Feedback,
     Hint,
     KnowledgeEdit,
     KnowledgeMerge,
@@ -17,8 +16,8 @@ from app.coach_schemas import (
 )
 from app.db import CoachRecord, User, WritingAssessmentRow, get_session
 from app.schemas import RagQuery
-from app.services.coach_model import generate
-from app.services.coach_prompts import TUTOR_GROUNDING
+from app.services.coach_model import generate, generation_failure_message
+from app.services.coach_prompts import TUTOR_GROUNDING, WRITING_FEEDBACK
 from app.services.learning_memory import (
     event_stats,
     invalidate_memory,
@@ -31,8 +30,9 @@ from app.services.personal_knowledge import backfill, index_payload, knowledge_v
 from app.services.rag import retrieve_official_rubric
 from app.services.retrieval_context import bounded_history, pack_evidence, retrieval_question
 from app.services.search_repository import retrieve_sources
+from app.services.tutor_citations import render_tutor_answer, validate_tutor_answer
 from app.services.vocabulary_extraction import enqueue_safely
-from app.services.writing import normalize_assessment, validate_assessment
+from app.services.writing_feedback import WritingFeedbackDraft, bind_writing_feedback
 
 router = APIRouter(prefix="/api/v1")
 
@@ -345,68 +345,38 @@ async def assess_version(
     )
     context["required_comparison_ids"] = previous_issue_ids
     allowed_personal = {hit.chunk_id for hit in matched}
-    allowed_citations = {c.source_id for c in citations}
 
-    def validate(value: Feedback) -> Feedback:
-        if len(value.assessment.criteria) != 4 or any(
-            not criterion.evidence for criterion in value.assessment.criteria
-        ):
-            raise ValueError("Exactly four criteria with essay evidence are required")
-        for issue in value.issues:
-            if issue.quote not in essay or set(issue.source_ids) - allowed_citations:
-                raise ValueError("Invalid issue evidence")
-        if len({issue.id for issue in value.issues}) != len(value.issues):
-            raise ValueError("Duplicate issue IDs")
-        if set(value.personal_source_ids) - allowed_personal:
-            raise ValueError("Invalid personal citation")
-        if value.personal_note and not value.personal_source_ids:
-            raise ValueError("Personal advice requires evidence")
-        if previous:
-            old_issues = {
-                issue["id"]: issue for issue in previous.payload["feedback"]["data"]["issues"]
-            }
-            if {i.issue_id for i in value.improvements} != set(old_issues) or len(
-                value.improvements
-            ) != len(old_issues):
-                raise ValueError("Each previous issue requires a comparison")
-            for item in value.improvements:
-                if (
-                    item.old_quote != old_issues[item.issue_id]["quote"]
-                    or item.new_quote not in essay
-                ):
-                    raise ValueError("Comparison quotes must be exact")
-                if item.status == "improved" and item.new_quote in previous.payload["essay"]:
-                    raise ValueError("Unchanged quote cannot establish improvement")
-        elif value.improvements:
-            raise ValueError("Initial version cannot compare a prior version")
-        value.assessment = normalize_assessment(value.assessment, essay, citations)
-        if validate_assessment(value.assessment, essay):
-            raise ValueError("Invalid assessment")
+    def validate(value: WritingFeedbackDraft) -> WritingFeedbackDraft:
+        bind_writing_feedback(value, essay, citations, allowed_personal, context["previous"])
         return value
 
+    failure = {}
     result = await generate(
         session,
         user.id,
         "writing",
         context,
-        Feedback,
-        "Assess Task 2 against public_rubric only. Return up to three issues with exact essay quotes, goals and public source IDs. "
-        "On revision compare every previous issue using exact old and new quotations. "
-        f"The improvements array must contain exactly {len(previous_issue_ids)} entries with issue_id values {previous_issue_ids}, including unresolved issues. "
-        "Copy each previous issue's quote exactly into old_quote; choose new_quote from the current essay. "
-        "Assign current issue IDs issue_1, issue_2, issue_3. "
-        "Personal notes inform learning advice and require personal_source_ids. Ground observations in the learner's original examples.",
+        WritingFeedbackDraft,
+        WRITING_FEEDBACK,
         validate,
+        failure=failure,
     )
     if not result:
-        version.payload = {**version.payload, "status": "unavailable"}
+        reason = failure.get("reason", "generation_failed")
+        message = generation_failure_message(reason) + "稿件已保存，可重试。"
+        version.payload = {**version.payload, "status": "unavailable", "failure_reason": reason,
+                           "failure_message": message}
         await session.commit()
         await enqueue_safely(session, user.id, version.id)
         return {
             **view(version),
             "mode": "offline",
-            "message": "模型暂不可用，稿件已保存。可重试或打开独立示例。",
+            "message": message,
         }
+    result.data = bind_writing_feedback(
+        WritingFeedbackDraft.model_validate(result.data), essay, citations, allowed_personal,
+        context["previous"],
+    ).model_dump(mode="json")
     result.data["assessment"]["model_used"] = result.model
     result.data["assessment"]["id"] = version.id
     result.citations = [
@@ -415,7 +385,8 @@ async def assess_version(
         if citation.source_id in result.data["personal_source_ids"]
     ]
     version.payload = {
-        **version.payload,
+        **{key: value for key, value in version.payload.items()
+           if key not in ("failure_reason", "failure_message")},
         "status": "assessed",
         "feedback": result.model_dump(mode="json"),
     }
@@ -505,6 +476,7 @@ async def hint(
     )
     if not issue:
         raise HTTPException(404, "Issue not found")
+    failure = {}
     result = await generate(
         session,
         user.id,
@@ -513,9 +485,10 @@ async def hint(
         Hint,
         "Give only the requested hint: 1 a thinking question; 2 a direction; 3 a short local rewrite example.",
         prefer_cache=True,
+        failure=failure,
     )
     if not result:
-        raise HTTPException(503, "模型暂不可用，可重试或查看离线示例")
+        raise HTTPException(503, generation_failure_message(failure.get("reason")))
     return result
 
 
@@ -535,20 +508,18 @@ async def ask_writing(
             CoachRecord.parent_id == version.id,
         )
     )
-    history = usable_history(conversation.payload.get("messages", [])) if conversation else []
+    reference_history = conversation.payload.get("messages", []) if conversation else []
+    history = usable_history(reference_history)
     citations, hits, _ = await retrieve_sources(
         session,
         user.id,
-        RagQuery(query=(retrieval_question(body.query, history) + " " + version.payload["essay"])[:2000], module="writing"),
+        RagQuery(query=(retrieval_question(body.query, reference_history) + " " + version.payload["essay"])[:2000], module="writing"),
     )
     citations, evidence = pack_evidence(citations, hits, body.query)
-    allowed = {c.source_id for c in citations}
-
     def validate(value: TutorAnswer) -> TutorAnswer:
-        if set(value.source_ids) - allowed or (value.sufficient and not value.source_ids):
-            raise ValueError("Invalid source")
-        return value
+        return validate_tutor_answer(value, citations)
 
+    failure = {}
     result = await generate(
         session,
         user.id,
@@ -564,28 +535,36 @@ async def ask_writing(
         TutorAnswer,
         "Answer the student's question about this essay. " + TUTOR_GROUNDING,
         validate,
+        failure=failure,
     )
     if not result:
         return {
             "mode": "offline",
-            "answer": "模型暂不可用，可重试或打开独立示例。",
+            "answer": generation_failure_message(failure.get("reason")),
             "citations": [],
+            "failure_reason": failure.get("reason", "generation_failed"),
         }
     data = TutorAnswer.model_validate(result.data)
-    answer = data.answer if data.sufficient else "当前资料不足以回答这个问题。"
+    response_mode = result.mode if data.sufficient else "insufficient"
+    system_message_key = None if data.sufficient else "rag.insufficientEvidence"
+    retrieved_sources = [] if data.sufficient else [c.model_dump() for c in citations]
+    answer = render_tutor_answer(data, citations) if data.sufficient else "当前资料不足以回答这个问题。"
     selected = (
         [c.model_dump() for c in citations if c.source_id in data.source_ids]
         if data.sufficient
         else []
     )
     messages = [
-        *history,
+        *reference_history,
         {
             "query": body.query,
             "context_source_ids": [c.source_id for c in citations],
             "answer": answer,
             "citations": selected,
-            "mode": result.mode,
+            "mode": response_mode,
+            "system_message_key": system_message_key,
+            "generation_mode": result.mode,
+            "retrieved_sources": retrieved_sources,
             "generated_at": result.generated_at,
         },
     ]
@@ -602,7 +581,10 @@ async def ask_writing(
         )
     await session.commit()
     return {
-        "mode": result.mode,
+        "mode": response_mode,
+        "system_message_key": system_message_key,
+        "generation_mode": result.mode,
+        "retrieved_sources": retrieved_sources,
         "answer": answer,
         "citations": selected,
         "generated_at": result.generated_at,

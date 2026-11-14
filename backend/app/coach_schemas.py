@@ -136,7 +136,9 @@ class Feedback(BaseModel):
 
 class TutorAnswer(BaseModel):
     answer: str = Field(min_length=1, max_length=12000)
-    source_ids: list[str] = Field(default_factory=list)
+    source_ids: list[str] = Field(
+        description="Exact source_id values copied from supplied sources, not display numbers or IDs from URLs. Use [] when evidence is insufficient."
+    )
     sufficient: bool
 
 

@@ -1,4 +1,5 @@
 import type { WritingAssessment } from "./api";
+import { localizeError, translate } from "./i18n";
 
 export interface Source {
   source_id: string; title: string; excerpt: string; source_type: string;
@@ -21,7 +22,7 @@ export interface Feedback {
     improvements: { issue_id: string; status: string; old_quote: string; new_quote: string; explanation: string }[];
     personal_note: string; personal_source_ids: string[] };
 }
-export interface WritingVersion { id: string; created_at: string; essay: string; status: string; feedback: Feedback | null }
+export interface WritingVersion { id: string; created_at: string; essay: string; status: string; feedback: Feedback | null; failure_reason?: string; failure_message?: string }
 export interface WritingSession { id: string; prompt: string; versions?: WritingVersion[] }
 export interface KnowledgeDraft {
   title: string; content: string; note: string; module: string; topic_tags: string[]; related_ids: string[]; source_url?: string | null; request_id: string;
@@ -29,7 +30,7 @@ export interface KnowledgeDraft {
 export interface BookmarkSource { source_type: "question" | "writing_version" | "conversation" | "document"; source_id: string; message_index?: number; chunk_id?: string }
 export interface MemoryEvent { id: string; event_type: string; occurred_at: string; title: string; content: string; status: string; provenance: string }
 export interface KnowledgeTopics { presets: { id: string; label: string }[]; items: { id: string; label: string; item_ids: string[]; note_count: number; unresolved_count: number; mistake_count: number }[] }
-export interface Answer { answer: string; citations: Source[]; mode: string; conversation_id?: string; generated_at?: string; context_stale?: boolean }
+export interface Answer { answer: string; citations: Source[]; mode: string; conversation_id?: string; generated_at?: string; context_stale?: boolean; failure_reason?: string | null; system_message_key?: string | null; generation_mode?: string | null; retrieved_sources?: Source[] }
 export interface Conversation { id: string; parent_id?: string; messages: (Answer & { query: string })[]; scope?: { source_type: string; document_ids: string[]; topic_tags?: string[] } }
 export interface Demo {
   prompt: string; knowledge: { title: string; content: string; category: string }[];
@@ -44,7 +45,7 @@ async function call<T>(token: string, path: string, method = "GET", body?: unkno
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(typeof error.detail === "string" ? error.detail : "请求失败，请重试");
+    throw new Error(typeof error.detail === "string" ? localizeError(error.detail) : translate("error.request"));
   }
   return response.status === 204 ? undefined as T : response.json();
 }

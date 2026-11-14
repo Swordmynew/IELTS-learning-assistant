@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n, localizeError } from "@/lib/i18n";
+
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, Check, Plus, Save } from "lucide-react";
 import Link from "next/link";
@@ -11,32 +13,33 @@ import { api, PracticeQuestionInput, Skill } from "@/lib/api";
 import { skillLabels, skills } from "@/lib/ui";
 
 const taskChoices: Record<Skill, { value: string; label: string }[]> = {
-  listening: [{ value: "form_completion", label: "表格 / 笔记填空" }, { value: "multiple_choice", label: "选择题" }, { value: "matching", label: "匹配题" }],
-  reading: [{ value: "true_false_not_given", label: "True / False / Not Given" }, { value: "multiple_choice", label: "选择题" }, { value: "sentence_completion", label: "句子填空" }, { value: "matching_headings", label: "段落标题匹配" }],
-  writing: [{ value: "writing_task_1", label: "Academic Writing Task 1" }, { value: "writing_task_2", label: "Writing Task 2" }],
-  speaking: [{ value: "speaking_part_1", label: "Speaking Part 1" }, { value: "speaking_part_2", label: "Speaking Part 2" }, { value: "speaking_part_3", label: "Speaking Part 3" }],
+  listening: [{ value: "form_completion", label: "ui.formNoteCompletion" }, { value: "multiple_choice", label: "ui.multipleChoice" }, { value: "matching", label: "ui.matching" }],
+  reading: [{ value: "true_false_not_given", label: "ui.trueFalseNotGiven" }, { value: "multiple_choice", label: "ui.multipleChoice" }, { value: "sentence_completion", label: "ui.sentenceCompletion" }, { value: "matching_headings", label: "ui.matchingHeadings" }],
+  writing: [{ value: "writing_task_1", label: "ui.academicWritingTask1" }, { value: "writing_task_2", label: "writing.task2" }],
+  speaking: [{ value: "speaking_part_1", label: "question.speakingPart1" }, { value: "speaking_part_2", label: "ui.speakingPart2" }, { value: "speaking_part_3", label: "ui.speakingPart3" }],
 };
 
 type FormState = { module: Skill; task_type: string; source_name: string; passage: string; prompt: string; options: string; correct_answer: string; explanation: string; tags: string };
-const initial: FormState = { module: "reading", task_type: "true_false_not_given", source_name: "我的练习套题", passage: "", prompt: "", options: "True\nFalse\nNot Given", correct_answer: "", explanation: "", tags: "" };
+const initial: FormState = { module: "reading", task_type: "true_false_not_given", source_name: "ui.myPracticeSet", passage: "", prompt: "", options: "True\nFalse\nNot Given", correct_answer: "", explanation: "", tags: "" };
 
 export default function NewQuestionPage() {
   return <SessionGate><NewQuestionContent /></SessionGate>;
 }
 
 function NewQuestionContent() {
+  const { t } = useI18n();
   const { token } = useDemoSession();
   const client = useQueryClient();
-  const [form, setForm] = useState<FormState>(initial);
+  const [form, setForm] = useState<FormState>(() => ({ ...initial, source_name: t(initial.source_name) }));
   const [message, setMessage] = useState("");
   const create = useMutation({
     mutationFn: (payload: PracticeQuestionInput) => api.createQuestion(token!, payload),
     onSuccess: () => {
-      setMessage("已保存");
+      setMessage("ui.saved");
       setForm((current) => ({ ...current, prompt: "", correct_answer: "", explanation: "" }));
       client.invalidateQueries({ queryKey: ["practice-questions"] });
     },
-    onError: (error: Error) => setMessage(`保存失败：${error.message}`),
+    onError: (error: Error) => setMessage("ui.couldNotSaveValue"),
   });
   const submit = (event: FormEvent) => {
     event.preventDefault(); setMessage("");
@@ -56,22 +59,22 @@ function NewQuestionContent() {
   const setModule = (module: Skill) => setForm({ ...form, module, task_type: taskChoices[module][0].value, options: module === "reading" ? "True\nFalse\nNot Given" : "" });
 
   return <main className="page narrow-page">
-    <PageHeader title="录入练习题" action={<Link className="secondary-button" href="/question-bank"><ArrowLeft size={16} />返回题库</Link>} />
-    {message && <div className={`notice ${create.isError ? "error" : "success"}`}>{!create.isError && <Check size={18} />}{message}</div>}
+    <PageHeader title={t("ui.addPracticeQuestion")} action={<Link className="secondary-button" href="/question-bank"><ArrowLeft size={16} />{t("ui.backToQuestionBank")}</Link>} />
+    {message && <div className={`notice ${create.isError ? "error" : "success"}`}>{!create.isError && <Check size={18} />}{t(message, { value1: localizeError(create.error?.message ?? "") })}</div>}
     <form className="panel question-form" onSubmit={submit}>
-      <section><span className="step-number">1</span><div><h2>题目归类</h2></div></section>
-      <div className="form-grid two-columns"><label className="field">科目<select value={form.module} onChange={(event) => setModule(event.target.value as Skill)}>{skills.map((skill) => <option value={skill} key={skill}>{skillLabels[skill]}</option>)}</select></label><label className="field">题型<select value={form.task_type} onChange={(event) => setForm({ ...form, task_type: event.target.value })}>{taskChoices[form.module].map((choice) => <option value={choice.value} key={choice.value}>{choice.label}</option>)}</select></label></div>
-      <label className="field">套题名称<input required minLength={1} maxLength={500} value={form.source_name} onChange={(event) => setForm({ ...form, source_name: event.target.value })} placeholder="例如：我的阅读练习 · Test 1" /><small>同名归为一组</small></label>
+      <section><span className="step-number">1</span><div><h2>{t("ui.questionCategory")}</h2></div></section>
+      <div className="form-grid two-columns"><label className="field">{t("ui.subject")}<select value={form.module} onChange={(event) => setModule(event.target.value as Skill)}>{skills.map((skill) => <option value={skill} key={skill}>{skillLabels[skill]}</option>)}</select></label><label className="field">{t("ui.questionType")}<select value={form.task_type} onChange={(event) => setForm({ ...form, task_type: event.target.value })}>{taskChoices[form.module].map((choice) => <option value={choice.value} key={choice.value}>{t(choice.label)}</option>)}</select></label></div>
+      <label className="field">{t("ui.setName")}<input required minLength={1} maxLength={500} value={form.source_name} onChange={(event) => setForm({ ...form, source_name: event.target.value })} placeholder={t("ui.eGMyReadingPracticeTest1")} /><small>{t("ui.questionsWithTheSameNameFormASet")}</small></label>
 
-      <section><span className="step-number">2</span><div><h2>材料与题目</h2></div></section>
-      <label className="field">阅读文章 / 听力原文（可选）<textarea className="material-input" value={form.passage} onChange={(event) => setForm({ ...form, passage: event.target.value })} placeholder="粘贴阅读文章或听力文字稿…" /></label>
-      <label className="field">题目<span className="required">必填</span><textarea required minLength={5} value={form.prompt} onChange={(event) => setForm({ ...form, prompt: event.target.value })} placeholder="题干及字数限制等作答要求…" /></label>
-      <label className="field">选项（可选，每行一个）<textarea className="short-textarea" value={form.options} onChange={(event) => setForm({ ...form, options: event.target.value })} placeholder={'选项 A\n选项 B\n选项 C'} /></label>
+      <section><span className="step-number">2</span><div><h2>{t("ui.passageAndQuestion")}</h2></div></section>
+      <label className="field">{t("ui.readingPassageListeningTranscriptOptional")}<textarea className="material-input" value={form.passage} onChange={(event) => setForm({ ...form, passage: event.target.value })} placeholder={t("ui.pasteAReadingPassageOrListeningTranscript")} /></label>
+      <label className="field">{t("ui.question")}<span className="required">{t("ui.required")}</span><textarea required minLength={5} value={form.prompt} onChange={(event) => setForm({ ...form, prompt: event.target.value })} placeholder={t("ui.questionAndAnswerRequirementsIncludingWordLimits")} /></label>
+      <label className="field">{t("ui.optionsOptionalOnePerLine")}<textarea className="short-textarea" value={form.options} onChange={(event) => setForm({ ...form, options: event.target.value })} placeholder={t("ui.optionAOptionBOptionC")} /></label>
 
-      <section><span className="step-number">3</span><div><h2>答案与解析</h2></div></section>
-      <div className="form-grid two-columns"><label className="field">参考答案（可选）<input value={form.correct_answer} onChange={(event) => setForm({ ...form, correct_answer: event.target.value })} placeholder="例如：public-health" /></label><label className="field">标签<input value={form.tags} onChange={(event) => setForm({ ...form, tags: event.target.value })} placeholder="定位, 同义替换（逗号分隔）" /></label></div>
-      <label className="field">答案解析（可选）<textarea className="short-textarea" value={form.explanation} onChange={(event) => setForm({ ...form, explanation: event.target.value })} placeholder="说明答案所在位置、干扰项或解题思路…" /></label>
-      <div className="form-footer"><button className="primary-button" type="submit" disabled={create.isPending || form.prompt.trim().length < 5 || !form.source_name.trim()}>{create.isPending ? <Save /> : <Plus />}{create.isPending ? "正在保存…" : "保存并继续录入"}</button></div>
+      <section><span className="step-number">3</span><div><h2>{t("ui.answerAndExplanation")}</h2></div></section>
+      <div className="form-grid two-columns"><label className="field">{t("ui.suggestedAnswerOptional")}<input value={form.correct_answer} onChange={(event) => setForm({ ...form, correct_answer: event.target.value })} placeholder={t("ui.eGPublicHealth")} /></label><label className="field">{t("ui.tags")}<input value={form.tags} onChange={(event) => setForm({ ...form, tags: event.target.value })} placeholder={t("ui.eGLocatingInformationParaphrasingCommaSeparated")} /></label></div>
+      <label className="field">{t("ui.answerExplanationOptional")}<textarea className="short-textarea" value={form.explanation} onChange={(event) => setForm({ ...form, explanation: event.target.value })} placeholder={t("ui.explainWhereToFindTheAnswerDistractorsOrTheApproach")} /></label>
+      <div className="form-footer"><button className="primary-button" type="submit" disabled={create.isPending || form.prompt.trim().length < 5 || !form.source_name.trim()}>{create.isPending ? <Save /> : <Plus />}{create.isPending ? t("ui.saving") : t("ui.saveAndAddAnother")}</button></div>
     </form>
   </main>;
 }

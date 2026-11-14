@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n, localizeError } from "@/lib/i18n";
+
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ArrowRight, CalendarDays, Check, CircleAlert, Clock3, LoaderCircle, RefreshCw, Undo2 } from "lucide-react";
 import Link from "next/link";
@@ -8,39 +10,40 @@ import { useMemo, useState } from "react";
 import { PageHeader, SessionGate } from "../app-shell";
 import { useDemoSession } from "../providers";
 import { api, generatePlanStream, StudyPlan } from "@/lib/api";
-import { formatDate, skillLabels, skillRoutes, taskAction } from "@/lib/ui";
+import { skillLabels, skillRoutes, taskAction } from "@/lib/ui";
 
 export default function PlanPage() {
   return <SessionGate><PlanContent /></SessionGate>;
 }
 
 function PlanContent() {
+  const { t, formatDate } = useI18n();
   const { token } = useDemoSession();
   const client = useQueryClient();
   const dashboard = useQuery({ queryKey: ["dashboard", token], queryFn: () => api.dashboard(token!) });
   const [draft, setDraft] = useState<StudyPlan | null>(null);
-  const [message, setMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
+  const [message, setMessage] = useState<{ type: "success" | "error"; text: string; error?: string } | null>(null);
 
   const [progress, setProgress] = useState("");
   const generate = useMutation({
-    onMutate: () => { setProgress("正在读取学习档案…"); setMessage(null); },
-    mutationFn: () => generatePlanStream(token!, event => { if (event.message) setProgress(event.message); }),
+    onMutate: () => { setProgress("ui.loadingYourLearningProfile"); setMessage(null); },
+    mutationFn: () => generatePlanStream(token!, event => { if (event.message) setProgress(event.node && ["intake", "diagnose", "retrieve", "plan", "validate"].includes(event.node) ? `plan.progress.${event.node}` : event.message); }),
     onSuccess: (plan) => {
       setProgress("");
       setDraft(plan);
-      setMessage({ type: "success", text: "草案已生成" });
+      setMessage({ type: "success", text: "ui.draftPlanCreated" });
       client.invalidateQueries({ queryKey: ["dashboard"] });
     },
-    onError: (error: Error) => { setProgress(""); setMessage({ type: "error", text: `生成失败：${error.message}` }); },
+    onError: (error: Error) => { setProgress(""); setMessage({ type: "error", text: "ui.couldNotCreateThePlanValue", error: error.message }); },
   });
   const approve = useMutation({
     mutationFn: () => api.approvePlan(token!, draft!.id),
     onSuccess: () => {
       setDraft(null);
-      setMessage({ type: "success", text: "计划已启用" });
+      setMessage({ type: "success", text: "ui.planActivated" });
       client.invalidateQueries({ queryKey: ["dashboard"] });
     },
-    onError: (error: Error) => setMessage({ type: "error", text: `确认失败：${error.message}` }),
+    onError: (error: Error) => setMessage({ type: "error", text: "ui.couldNotApproveThePlanValue", error: error.message }),
   });
   const updateCompletion = useMutation({
     mutationFn: ({ taskId, completed }: { taskId: string; completed: boolean }) =>
@@ -48,11 +51,11 @@ function PlanContent() {
     onSuccess: (task) => {
       setMessage({
         type: "success",
-        text: task.completed ? "任务已完成" : "任务已恢复",
+        text: task.completed ? "ui.taskCompleted" : "ui.taskRestored",
       });
       client.invalidateQueries({ queryKey: ["dashboard"] });
     },
-    onError: (error: Error) => setMessage({ type: "error", text: `更新任务失败：${error.message}` }),
+    onError: (error: Error) => setMessage({ type: "error", text: "ui.couldNotUpdateTheTaskValue", error: error.message }),
   });
 
   const plan = draft ?? dashboard.data?.active_plan ?? null;
@@ -68,32 +71,32 @@ function PlanContent() {
   }, [plan]);
   const completed = plan?.tasks.filter((task) => task.completed).length ?? 0;
   const rationale = plan?.rationale.includes("CP-SAT") || plan?.rationale.includes("deterministic fallback")
-    ? "已按照你每天可用的时间安排任务，并优先照顾当前分差较大的科目。"
+    ? t("ui.tasksFitYourDailyAvailabilityWithExtraAttentionToSubjectsFurthestFromYourTargetScores")
     : plan?.rationale;
 
   return <main className="page">
-    <PageHeader title="本周计划" action={<button className="primary-button" onClick={() => generate.mutate()} disabled={generate.isPending}>{generate.isPending ? <LoaderCircle className="spin" size={17} /> : <RefreshCw size={17} />}{plan ? "重新生成计划" : "生成本周计划"}</button>} />
-    {generate.isPending && <p className="profile-update-note" role="status">{progress}</p>}
-    {message && <div className={`notice ${message.type}`} role="status">{message.type === "error" ? <CircleAlert size={18} /> : <Check size={18} />}{message.text}</div>}
-    {!dashboard.data?.profile ? <div className="panel empty-state"><CalendarDays /><h2>先填写学习档案</h2><Link className="primary-button" href="/profile">填写学习档案</Link></div> : !plan ? <div className="panel empty-state"><CalendarDays /><h2>还没有学习计划</h2></div> : <>
+    <PageHeader title={t("ui.weeklyPlan")} action={<button className="primary-button" onClick={() => generate.mutate()} disabled={generate.isPending}>{generate.isPending ? <LoaderCircle className="spin" size={17} /> : <RefreshCw size={17} />}{plan ? t("ui.regeneratePlan") : t("ui.createWeeklyPlan")}</button>} />
+    {generate.isPending && <p className="profile-update-note" role="status">{t(localizeError(progress))}</p>}
+    {message && <div className={`notice ${message.type}`} role="status">{message.type === "error" ? <CircleAlert size={18} /> : <Check size={18} />}{t(message.text, { value1: t(localizeError(message.error ?? "")) })}</div>}
+    {!dashboard.data?.profile ? <div className="panel empty-state"><CalendarDays /><h2>{t("ui.setUpYourLearningProfileFirst")}</h2><Link className="primary-button" href="/profile">{t("ui.setUpLearningProfile")}</Link></div> : !plan ? <div className="panel empty-state"><CalendarDays /><h2>{t("ui.noStudyPlanYet")}</h2></div> : <>
       <section className={`plan-summary ${draft ? "draft" : "active"}`}>
-        <div><span className="status-pill">{draft ? "待确认" : "已启用"}</span><h2>{plan.starts_on} — {plan.ends_on}</h2><details className="plan-rationale"><summary>安排依据</summary><p>{rationale}</p></details></div>
-        <div className="plan-stats"><div><strong>{plan.tasks.length}</strong><span>项任务</span></div><div><strong>{plan.tasks.reduce((sum, task) => sum + task.duration_minutes, 0)}</strong><span>分钟</span></div><div><strong>{completed}</strong><span>已完成</span></div></div>
-        {draft && <button className="approve-button" onClick={() => approve.mutate()} disabled={approve.isPending || generate.isPending || !!draft.conflicts.length}>{approve.isPending ? <LoaderCircle className="spin" size={17} /> : <Check size={18} />}{approve.isPending ? "正在启用…" : "启用计划"}</button>}
+        <div><span className="status-pill">{draft ? t("ui.awaitingApproval") : t("ui.active")}</span><h2>{formatDate(plan.starts_on, { timeZone: "UTC" })} — {formatDate(plan.ends_on, { timeZone: "UTC" })}</h2><details className="plan-rationale"><summary>{t("ui.whyThisSchedule")}</summary><p>{rationale}</p></details></div>
+        <div className="plan-stats"><div><strong>{plan.tasks.length}</strong><span>{t("ui.tasks")}</span></div><div><strong>{plan.tasks.reduce((sum, task) => sum + task.duration_minutes, 0)}</strong><span>{t("ui.minutes")}</span></div><div><strong>{completed}</strong><span>{t("ui.completed")}</span></div></div>
+        {draft && <button className="approve-button" onClick={() => approve.mutate()} disabled={approve.isPending || generate.isPending || !!draft.conflicts.length}>{approve.isPending ? <LoaderCircle className="spin" size={17} /> : <Check size={18} />}{approve.isPending ? t("ui.activating") : t("ui.activatePlan")}</button>}
       </section>
-      {plan.conflicts.length > 0 && <div className="notice warning"><CircleAlert size={18} /><div><strong>安排限制</strong>{plan.conflicts.map((conflict) => <p key={conflict}>{conflict}</p>)}</div></div>}
+      {plan.conflicts.length > 0 && <div className="notice warning"><CircleAlert size={18} /><div><strong>{t("ui.schedulingLimits")}</strong>{plan.conflicts.map((conflict) => <p key={conflict}>{conflict}</p>)}</div></div>}
       <section className="week-grid" style={{ gridTemplateColumns: `repeat(${dates.length || 1}, minmax(140px, 1fr))` }}>{dates.map((date) => {
         const tasks = plan.tasks.filter((task) => task.scheduled_date === date);
         const minutes = tasks.reduce((sum, task) => sum + task.duration_minutes, 0);
         const day = new Date(`${date}T00:00:00Z`).getUTCDay() || 7;
         const capacity = dashboard.data?.profile?.minutes_by_weekday[String(day)] ?? 0;
         return <article className="day-column" key={date}>
-          <header><div><strong>{formatDate(date)}</strong><span>{minutes} / {capacity} 分钟</span></div><div className="capacity-track"><span style={{ width: `${capacity ? Math.min(100, minutes / capacity * 100) : 0}%` }} /></div></header>
+          <header><div><strong>{formatDate(date, { timeZone: "UTC", month: "long", day: "numeric", weekday: "short" })}</strong><span>{t("plan.capacityMinutes", { used: minutes, capacity })}</span></div><div className="capacity-track"><span style={{ width: `${capacity ? Math.min(100, minutes / capacity * 100) : 0}%` }} /></div></header>
           <div className="day-tasks">{tasks.length ? tasks.map((task) => <div className={`plan-task ${task.completed ? "done" : ""}`} key={task.id}>
-            <div className="task-top"><span className={`skill-tag ${task.skill}`}>{skillLabels[task.skill]}</span><span><Clock3 size={13} /> {task.duration_minutes} 分钟</span></div>
-            <h3>{task.title}</h3><details className="task-objective"><summary>练习目标</summary><p>{task.objective}</p></details>
-            <div className="task-actions"><Link href={skillRoutes[task.skill]}>{taskAction(task)} <ArrowRight size={14} /></Link>{!draft && <button className={task.completed ? "restore-task" : ""} onClick={() => updateCompletion.mutate({ taskId: task.id, completed: !task.completed })} disabled={updateCompletion.isPending && updateCompletion.variables?.taskId === task.id}>{task.completed && <Undo2 size={13} />}{updateCompletion.isPending && updateCompletion.variables?.taskId === task.id ? "更新中…" : task.completed ? "恢复任务" : "标记完成"}</button>}</div>
-          </div>) : <div className="rest-day">休息 / 补做</div>}</div>
+            <div className="task-top"><span className={`skill-tag ${task.skill}`}>{skillLabels[task.skill]}</span><span><Clock3 size={13} /> {t("common.minutesCount", { count: task.duration_minutes })}</span></div>
+            <h3>{task.title}</h3><details className="task-objective"><summary>{t("ui.practiceGoal")}</summary><p>{task.objective}</p></details>
+            <div className="task-actions"><Link href={skillRoutes[task.skill]}>{taskAction(task)} <ArrowRight size={14} /></Link>{!draft && <button className={task.completed ? "restore-task" : ""} onClick={() => updateCompletion.mutate({ taskId: task.id, completed: !task.completed })} disabled={updateCompletion.isPending && updateCompletion.variables?.taskId === task.id}>{task.completed && <Undo2 size={13} />}{updateCompletion.isPending && updateCompletion.variables?.taskId === task.id ? t("ui.updating") : task.completed ? t("ui.restoreTask") : t("ui.markComplete")}</button>}</div>
+          </div>) : <div className="rest-day">{t("ui.restCatchUp")}</div>}</div>
         </article>;
       })}</section>
     </>}
