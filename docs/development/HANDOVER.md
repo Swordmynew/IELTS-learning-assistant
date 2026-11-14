@@ -2,20 +2,20 @@
 
 ## 接手顺序
 
-先读 [START_HERE](../START_HERE.md)、[QUICKSTART](QUICKSTART.md)、[USER_GUIDE](USER_GUIDE.md) 和 [最新验收](ITERATION_2026-11-12.md)，再跑 [演示步骤](DEMO_WALKTHROUGH.md)。当前交付为个人仓库 main，克隆和推送说明见 [仓库使用](GITHUB_WORKFLOW.md)。不要先连接真实数据库或更换环境。
+先读 [START_HERE](../../START_HERE.md)、[QUICKSTART](../guides/QUICKSTART.md)、[USER_GUIDE](../guides/USER_GUIDE.md) 和 [最新验收](../history/ITERATION_2026-11-12.md)，再跑 [演示步骤](../guides/DEMO_WALKTHROUGH.md)。当前交付为个人仓库 main，克隆和推送说明见 [仓库使用](../guides/GITHUB_WORKFLOW.md)。不要先连接真实数据库或更换环境。
 
 ## 代码地图
 
 | 区域 | 主入口 |
 | --- | --- |
-| FastAPI 与登录/题库/计划 API | backend/app/main.py、api.py、auth.py |
+| FastAPI 与登录/题库/计划 API | backend/app/main.py、routes/core.py、auth.py |
 | 排程与执行轨迹 | services/planner.py、services/planning_runs.py、agents/workflow.py |
 | 事务审批与画像 | repository.py、db.py；0008 迁移中的 approved 唯一索引 |
-| 写作与个人知识接口 | coach_api.py、memory_api.py |
+| 写作与个人知识接口 | routes/coach.py、routes/memory.py |
 | 个人记忆事件 | services/learning_memory.py、personal_knowledge.py |
 | 检索、预算与模型 | services/search_repository.py、retrieval_context.py、coach_model.py |
-| 摄入与页码原文 | ingestion.py、document_api.py |
-| 词卡与提词 | vocabulary_api.py、services/word_deck.py、vocabulary_extraction.py |
+| 摄入与页码原文 | ingestion.py、routes/documents.py |
+| 词卡与提词 | routes/vocabulary.py、services/word_deck.py、vocabulary_extraction.py |
 | Next.js 页面 | frontend/app/ 下按路由划分 |
 | 个人知识与来源阅读 | resources/、coach-components.tsx、floating-tutor.tsx |
 | 客户端 API | frontend/lib/api.ts、coach.ts、vocabulary.ts |
@@ -31,18 +31,12 @@
 在本机现有解释器环境，所有产物留在项目 tmp 子目录：
 
 ```powershell
-$env:PYTHONNOUSERSITE='1'
-$env:PYTHONUTF8='1'
-cd backend
-& 'D:\Anaconda3\envs\ielts-coach\python.exe' -m ruff check app tests scripts
-& 'D:\Anaconda3\envs\ielts-coach\python.exe' -m pytest -p no:cacheprovider --basetemp ../tmp/verification --junitxml ../tmp/backend-tests.xml
-cd ../frontend
-npm run typecheck
-# 与 next dev 共用 .next 时先停止开发服务，再构建；本次验收使用独立副本构建。
-npm run build
-# 先启动本地两端；可用现有 Edge，避免重复下载浏览器。
-$env:PLAYWRIGHT_CHANNEL='msedge'
-npx playwright test --output=../tmp/browser-results
+# 从仓库根目录运行；产物全部放 local-data/verification。
+.\scripts\verify-local.ps1
+# 生产构建：先停止占用同一 .next 的开发服务。
+.\scripts\verify-local.ps1 -Build
+# 浏览器回归：先启动隔离预览服务。
+.\scripts\verify-local.ps1 -Browser
 ```
 
 Playwright 有 14 条模拟接口界面回归与 6 条真实离线 API 流程。后者创建可丢弃测试账号，仅对隔离预览库运行。后端测试默认内存数据库，部分审批/迁移用临时文件 SQLite。不要将浏览器验收指向正式服务。

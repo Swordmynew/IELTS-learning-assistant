@@ -1,6 +1,6 @@
 # 第二轮补充与验收：规划可靠性、RAG 上下文及 PDF 来源
 
-日期：2026-11-12。分支：`feature/personal-learning-coach`，基线 `1b9d3d1`，包含 11 月 11 日个性化记忆首轮改动。这是实现时的来源基线；当前交付仓库和默认分支见 [START_HERE](../START_HERE.md)。
+日期：2026-11-12。分支：`feature/personal-learning-coach`，基线 `1b9d3d1`，包含 11 月 11 日个性化记忆首轮改动。这是实现时的来源基线；当前交付仓库和默认分支见 [START_HERE](../../START_HERE.md)。
 
 ## 已实现
 
@@ -61,7 +61,7 @@
 
 前端 http://127.0.0.1:3000 ，健康检查 http://127.0.0.1:8000/api/v1/health 。保持离线模型与哈希向量，沿用 Conda `D:\Anaconda3\envs\ielts-coach\python.exe`、`PYTHONNOUSERSITE=1`；没有安装依赖、创建 uv/venv 或修改 ai-dev/CUDA。
 
-本次仅备份并迁移独立演示数据库 `tmp/review-20261111/preview.db`。升级前备份为 `tmp/iteration-20261112/preview-before-0008-*.db`。原项目实际用户数据库未连接。
+本次仅备份并迁移独立演示数据库 `local-data/runtime/preview.db`。升级前备份为 `tmp/iteration-20261112/preview-before-0008-*.db`。原项目实际用户数据库未连接。
 
 启动脚本 `scripts/start-conda-preview.ps1` 支持默认启动两端、`-BackendOnly`、`-FrontendOnly`；分别检查端口并验证就绪。运行时数据仍在原预览目录，JWT 本地文件保留，避免重启丢失既有演示数据。端口已占用时直接打开已有服务，或仅启动缺失的一端。
 

@@ -156,7 +156,7 @@ def test_document_source_api_preserves_pages_and_protects_original_file(tmp_path
     from app.main import app
 
     monkeypatch.setattr(get_settings(), "upload_dir", tmp_path / "uploads")
-    monkeypatch.setattr("app.api.enqueue_ingestion", lambda *args: False)
+    monkeypatch.setattr("app.routes.core.enqueue_ingestion", lambda *args: False)
     path = pdf_fixture(tmp_path / "source.pdf", ["First synthetic page.", None, "Third synthetic page."])
     with TestClient(app) as client:
         def register():
@@ -188,7 +188,7 @@ def test_duplicate_text_on_different_pdf_pages_keeps_selected_chunk_location(tmp
     from app.main import app
 
     monkeypatch.setattr(get_settings(), "upload_dir", tmp_path / "uploads")
-    monkeypatch.setattr("app.api.enqueue_ingestion", lambda *args: False)
+    monkeypatch.setattr("app.routes.core.enqueue_ingestion", lambda *args: False)
     path = pdf_fixture(tmp_path / "repeated.pdf", ["Repeated synthetic rule.", "Repeated synthetic rule."])
     with TestClient(app) as client:
         auth = client.post("/api/v1/auth/register", json={"email": f"{uuid4()}@example.com", "password": "SyntheticSource123"}).json()

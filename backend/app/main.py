@@ -4,15 +4,15 @@ from contextlib import asynccontextmanager, suppress
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api import router
-from app.coach_api import router as coach_router
 from app.config import get_settings
 from app.db import create_schema
-from app.document_api import router as document_router
-from app.memory_api import router as memory_router
+from app.routes.coach import router as coach_router
+from app.routes.core import router
+from app.routes.documents import router as document_router
+from app.routes.memory import router as memory_router
+from app.routes.vocabulary import router as vocabulary_router
 from app.seed import seed_learning_guidance, seed_official_knowledge, seed_question_bank
 from app.services.vocabulary_extraction import extraction_worker
-from app.vocabulary_api import router as vocabulary_router
 
 
 @asynccontextmanager

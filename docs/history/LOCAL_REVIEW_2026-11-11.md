@@ -16,7 +16,7 @@
 
 建议先看“背单词”的翻卡和复习，再看写作工作台中的离线示例、资料和个人助手。当前启动强制 `COACH_OFFLINE=true`、`LLM_PROVIDER=offline`、`EMBEDDING_PROVIDER=hashing`。固定作文示例有明确标记；新作文的真实 AI 评分及生成式问答需要另行配置模型。当前哈希向量用于功能演示，不代表语义检索质量。
 
-运行数据、日志、进程 PID、截图均在 `tmp/review-20261111/`。预览使用该目录的独立 `preview.db`，迁移到本分支 `0007_personal_coach`；没有连接旧项目的 `0012_model_calls` 数据库。
+运行数据、日志、进程 PID、截图均在 `local-data/runtime/`。预览使用该目录的独立 `preview.db`，迁移到本分支 `0007_personal_coach`；没有连接旧项目的 `0012_model_calls` 数据库。
 
 ## 启动方式（现有 Conda，不创建 venv）
 
@@ -32,7 +32,7 @@
 
 首次新检出需先使用目标解释器运行 `backend/scripts/import_starter_vocabulary.py` 生成 ECDICT 词库，并在 frontend 执行 `npm ci`。当前词库已生成 8,520 个词条；生成数据和依赖没有提交 Git。
 
-查看或停止进程时先读取 `tmp/review-20261111/processes.json`，用 `Get-Process -Id <PID>` 核对记录的 API/Web 进程，再停止本次预览进程。不要按所有 python/node 进程批量结束。后端日志为 `backend.err.log`，前端日志为 `frontend.out.log`/`frontend.err.log`。预览 JWT 密钥存放在忽略目录，不应上传。
+查看或停止进程时先读取 `local-data/runtime/processes.json`，用 `Get-Process -Id <PID>` 核对记录的 API/Web 进程，再停止本次预览进程。不要按所有 python/node 进程批量结束。后端日志为 `backend.err.log`，前端日志为 `frontend.out.log`/`frontend.err.log`。预览 JWT 密钥存放在忽略目录，不应上传。
 
 ## 已核对的功能
 
@@ -50,10 +50,10 @@
 
 | 项目 | 本次结果 | 范围/证据 |
 | --- | --- | --- |
-| 后端 pytest | 61 通过，0 失败/跳过 | `tmp/review-20261111/backend-final.xml`；包含新密钥隔离回归 |
+| 后端 pytest | 61 通过，0 失败/跳过 | `local-data/runtime/backend-final.xml`；包含新密钥隔离回归 |
 | Ruff | 通过 | 对 backend 的 app、tests、scripts 检查 |
 | 前端类型检查 | 通过 | `frontend` 内 `npm run typecheck` |
-| 前端生产构建 | 通过 | `tmp/review-20261111/frontend-build/build.log`；源码副本构建，避免覆盖运行中 dev 的 .next；副本只额外设置 Turbopack root 以容纳共享 node_modules junction |
+| 前端生产构建 | 通过 | `local-data/runtime/frontend-build/build.log`；源码副本构建，避免覆盖运行中 dev 的 .next；副本只额外设置 Turbopack root 以容纳共享 node_modules junction |
 | 浏览器实际操作 | 通过 | 演示登录、8,520 词词库及写作离线示例打开；截图 `writing-preview.jpg` |
 | API/Web 可访问 | 通过 | 本地健康检查及首页 HTTP 200 |
 | 实际供应商与模型质量 | 未验收 | 当前没有真实模型调用；仓库作者先前记录不等于本机验收 |
@@ -64,7 +64,7 @@
 
 ### P1：排程截止日期、画像变化与批准一致性
 
-1. **考试日期边界已复现**：`backend/app/services/planner.py` 的两个排程分支均使用连续七天，没有截断考试日；`validate_plan` 也没有该校验。输入考试在明天、每天 120 分钟时，生成任务中有任务在考试当天/之后，校验仍为空。实际输出及复现脚本保存在 `tmp/review-20261111/planner-exam-repro.{json,py}`。
+1. **考试日期边界已复现**：`backend/app/services/planner.py` 的两个排程分支均使用连续七天，没有截断考试日；`validate_plan` 也没有该校验。输入考试在明天、每天 120 分钟时，生成任务中有任务在考试当天/之后，校验仍为空。实际输出及复现脚本保存在 `local-data/runtime/planner-exam-repro.{json,py}`。
    - 建议统一学习时区并明确考试日是否可学习；按产品选择默认考前一天截止。两个算法、计划范围和验证器使用同一边界。
    - 验收包括：考试明天/一周内、跨午夜、当天零时间、强制任务时间不足；不能为了满足周必做任务而越过考试截止。
 2. **批准时重新验证**：`backend/app/repository.py::approve_plan` 当前读取计划后直接替换 approved 状态，缺少当前画像版本和草案状态核验。过期/已被替代计划可能被重新批准；并发一致性也需专项验证。本次为代码审查发现，尚未运行并发复现。
@@ -98,4 +98,4 @@
 
 先打开本地页面体验，再读本文、README、`docs/COACH_DEMO.md`、`docs/COACH_VALIDATION.md`、`docs/VOCABULARY_LEARNING.md`。随后优先修复上述 P1 排程/批准问题，再安排真实模型和检索评测；最后逐项整合旧目录功能。执行前先 `git status`，保留本次密钥修复、回归测试、启动脚本和审查文档。`frontend/next-env.d.ts` 的 dev 类型路径变化是 Next.js 启动生成的。
 
-个性化 RAG 的课程依据、功能补齐和验收方案见 [PERSONALIZED_RAG_PLAN.md](PERSONALIZED_RAG_PLAN.md)；首轮实现和最新验收见 [PERSONALIZED_RAG_IMPLEMENTATION.md](PERSONALIZED_RAG_IMPLEMENTATION.md)。
+个性化 RAG 的课程依据、功能补齐和验收方案见 [PERSONALIZED_RAG_PLAN.md](../rag/PERSONALIZED_RAG_PLAN.md)；首轮实现和最新验收见 [PERSONALIZED_RAG_IMPLEMENTATION.md](../rag/PERSONALIZED_RAG_IMPLEMENTATION.md)。

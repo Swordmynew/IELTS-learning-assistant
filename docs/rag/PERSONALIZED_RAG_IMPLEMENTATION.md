@@ -1,8 +1,8 @@
 # 个性化 RAG 首轮实现与验收（2026-11-11）
 
-最新状态见 [第二轮补充与验收](ITERATION_2026-11-12.md)，本文件保留首轮基线与当时状态。
+最新状态见 [第二轮补充与验收](../history/ITERATION_2026-11-12.md)，本文件保留首轮基线与当时状态。
 
-代码位于 `upstream/personal-learning-coach`，基于 `feature/personal-learning-coach` 的 `1b9d3d1`，这是实现时的来源基线；当前交付仓库和默认分支见 [START_HERE](../START_HERE.md)。
+代码位于 `upstream/personal-learning-coach`，基于 `feature/personal-learning-coach` 的 `1b9d3d1`，这是实现时的来源基线；当前交付仓库和默认分支见 [START_HERE](../../START_HERE.md)。
 
 ## 已完成
 
@@ -39,10 +39,10 @@
 
 ## 本轮验证
 
-- 后端 **85 项测试通过**，含原有流程和新增个人记忆/来源/缓存回归；结果：`tmp/review-20261111/personal-rag-tests.xml`。
+- 后端 **85 项测试通过**，含原有流程和新增个人记忆/来源/缓存回归；结果：`local-data/runtime/personal-rag-tests.xml`。
 - Ruff 检查通过。
-- 前端类型检查通过，独立源码副本的生产构建通过；日志：`tmp/review-20261111/frontend-build/build.log`。
-- 全部 **17 条浏览器流程通过**：14 条既有模拟接口界面回归，3 条使用真实运行中离线 API 的新流程；日志：`tmp/review-20261111/browser-all.log`。
+- 前端类型检查通过，独立源码副本的生产构建通过；日志：`local-data/runtime/frontend-build/build.log`。
+- 全部 **17 条浏览器流程通过**：14 条既有模拟接口界面回归，3 条使用真实运行中离线 API 的新流程；日志：`local-data/runtime/browser-all.log`。
 - 新流程涵盖：桌面新建/编辑/检索/复习/删除；从实际题目及作文收藏；手机表单与知识点筛选。
 - 测试资料、账号、文档片段和模型响应均为明确的合成测试夹具。浏览器测试账号仅写入本次独立预览数据库；原实际用户数据库未连接。
 - 截图：`personal-memory-desktop.png`、`personal-memory-mobile-form.png`、`personal-memory-mobile.png`，位于同一 tmp 目录。

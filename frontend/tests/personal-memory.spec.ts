@@ -39,7 +39,7 @@ test("real API: note create, edit, retrieval, self-review and delete", async ({ 
   await expect(card).toContainText("自评：已改善");
   await card.getByText("学习记录", { exact: true }).click();
   await expect(card).toContainText("功能测试：已完成一条自拟例句。");
-  await page.screenshot({ path: "../tmp/review-20261111/personal-memory-desktop.png", fullPage: true });
+  await page.screenshot({ path: "../local-data/verification/screenshots/personal-memory-desktop.png", fullPage: true });
   await card.getByRole("button", { name: "删除知识条目" }).click();
   await expect(card).toHaveCount(0);
   await page.getByRole("button", { name: "查找", exact: true }).click();
@@ -86,11 +86,11 @@ test("real API: mobile note form and topic filter fit viewport", async ({ page }
   await editor.getByLabel("笔记内容", { exact: true }).fill("Make a decision, not do a decision.");
   await editor.getByLabel("知识点标签", { exact: true }).fill("搭配");
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
-  await page.screenshot({ path: "../tmp/review-20261111/personal-memory-mobile-form.png", fullPage: true });
+  await page.screenshot({ path: "../local-data/verification/screenshots/personal-memory-mobile-form.png", fullPage: true });
   await editor.getByRole("button", { name: "保存笔记", exact: true }).click();
   await expect(editor).toBeHidden();
   await page.getByRole("combobox", { name: "按知识点筛选" }).selectOption("lexical.collocation");
   await expect(page.getByRole("heading", { name: "搭配笔记（功能测试）" })).toBeVisible();
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBeTruthy();
-  await page.screenshot({ path: "../tmp/review-20261111/personal-memory-mobile.png", fullPage: true });
+  await page.screenshot({ path: "../local-data/verification/screenshots/personal-memory-mobile.png", fullPage: true });
 });

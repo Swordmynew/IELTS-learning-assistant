@@ -1,0 +1,40 @@
+{
+  "date": "2026-11-14",
+  "source_base": "1e0c22f150bb12da7432ce9710a6bea0bf68cd37",
+  "target_repository": "Swordmynew/IELTS-learning-assistant",
+  "target_branch": "ccy最新-20261114",
+  "backend": {
+    "passed": 152,
+    "seconds": 26.01
+  },
+  "browser": {
+    "passed": 20,
+    "real_api": 6,
+    "mocked": 14
+  },
+  "production_build": "passed in new project directory",
+  "typecheck": "passed",
+  "ruff": "passed",
+  "api_contract": "62 method/path pairs unchanged",
+  "documentation": "23 Markdown files checked; no broken local links",
+  "runtime_health_after_old_deletion": "ok",
+  "old_directory_removed": true,
+  "legacy_archive": {
+    "files": 1961,
+    "sha256_verification": "each archived file passed",
+    "local_only": true
+  },
+  "previous_preview_archive": {
+    "files": 1629,
+    "sha256_verification": "each archived file passed",
+    "local_only": true
+  },
+  "legacy_0012_database_migrated": false,
+  "current_preview_migration": "0008_plan_approval_guard",
+  "real_model_verified": false,
+  "postgresql_redis_docker_verified": false,
+  "secret_scan": {
+    "tracked_files": 163,
+    "findings": 0
+  }
+}

@@ -5,7 +5,7 @@
 本机已验证 Python：`D:\Anaconda3\envs\ielts-coach\python.exe`（3.11）。不要改动 ai-dev 的 AI/CUDA 配套；不要默认创建 uv/venv。其他电脑先找兼容的已有 Conda 环境，再设置解释器路径。
 
 ```powershell
-git clone https://github.com/Charles-art36/IELTS-learning-assistant.git
+git clone --branch "ccy最新-20261114" https://github.com/Swordmynew/IELTS-learning-assistant.git
 cd IELTS-learning-assistant
 $IeltsPython = 'D:\Anaconda3\envs\ielts-coach\python.exe'
 $env:PYTHONNOUSERSITE = '1'
@@ -31,7 +31,7 @@ npm ci --prefix frontend
 
 ## 预览数据与进程
 
-启动脚本强制离线生成模式和哈希向量。无需 API 密钥；不调用收费模型。它将独立 SQLite、上传、日志、缓存、JWT 本地密钥与 PID 写到本项目 `tmp/review-20261111/`，先迁移再启动，保留演示数据。
+启动脚本强制离线生成模式和哈希向量。无需 API 密钥；不调用收费模型。它将独立 SQLite、上传、日志、缓存、JWT 本地密钥与 PID 写到本项目 `local-data/runtime/`，先迁移再启动，保留演示数据。
 
 - 前端缺失、后端已运行：` .\scripts\start-conda-preview.ps1 -FrontendOnly `。
 - 后端缺失、前端已运行：` .\scripts\start-conda-preview.ps1 -BackendOnly `。

@@ -47,7 +47,7 @@ cd backend
 ## 数据与备份
 
 - 当前 Alembic head：0008_plan_approval_guard。旧目录 0012_model_calls 是另一条迁移链，禁止直接混接。
-- 预览库、上传和 JWT 密钥在项目 tmp/review-20261111；真实环境路径由配置指定。
+- 预览库、上传和 JWT 密钥在项目 local-data/runtime；真实环境路径由配置指定。
 - 备份应覆盖数据库、上传原文件和安全保存的必要配置，词库与向量可重建。不要把它们上传公共 GitHub。
 - 本分支尚未完成备份恢复实机演练。SQLite 冷备份需先停写入并关闭服务；在线备份使用 SQLite backup API，避免仅复制主文件而遗漏 WAL。
 - 0008 会规范历史重复 approved 状态；降级只移除约束，不恢复重复状态。完整回退依赖备份。

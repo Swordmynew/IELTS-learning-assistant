@@ -7,7 +7,7 @@ param(
 $ErrorActionPreference = 'Stop'
 if ($BackendOnly -and $FrontendOnly) { throw 'Choose either -BackendOnly or -FrontendOnly.' }
 $projectRoot = Split-Path -Parent $PSScriptRoot
-$runtimeRoot = Join-Path $projectRoot 'tmp\review-20261111'
+$runtimeRoot = Join-Path $projectRoot 'local-data\runtime'
 $backendRoot = Join-Path $projectRoot 'backend'
 $frontendRoot = Join-Path $projectRoot 'frontend'
 if (-not (Test-Path -LiteralPath $PythonPath)) { throw "Conda interpreter not found: $PythonPath" }
@@ -31,7 +31,7 @@ foreach ($port in $ports) {
 New-Item -ItemType Directory -Force -Path $runtimeRoot | Out-Null
 $statePath = Join-Path $runtimeRoot 'processes.json'
 $previous = if (Test-Path -LiteralPath $statePath) { Get-Content -LiteralPath $statePath -Raw | ConvertFrom-Json } else { $null }
-$state = @{ api=$previous.api; web=$previous.web; url='http://127.0.0.1:3000'; offline=$true; database='tmp/review-20261111/preview.db'; source_commit=(& git -C $projectRoot rev-parse HEAD) }
+$state = @{ api=$previous.api; web=$previous.web; url='http://127.0.0.1:3000'; offline=$true; database='local-data/runtime/preview.db'; source_commit=(& git -C $projectRoot rev-parse HEAD) }
 $env:TEMP = Join-Path $runtimeRoot 'process-temp'
 $env:TMP = $env:TEMP
 New-Item -ItemType Directory -Force -Path $env:TEMP | Out-Null

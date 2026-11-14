@@ -11,7 +11,6 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.auth import current_user
-from app.coach_api import owned
 from app.coach_schemas import KnowledgeBookmark, KnowledgeCreate, KnowledgeReview
 from app.db import (
     CoachRecord,
@@ -21,6 +20,7 @@ from app.db import (
     User,
     get_session,
 )
+from app.routes.coach import owned
 from app.schemas import RagQuery
 from app.services.learning_memory import (
     TOPICS,

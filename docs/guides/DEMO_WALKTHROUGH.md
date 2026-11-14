@@ -39,16 +39,16 @@
 
 演示数据仅留在被忽略的本机预览库。其他电脑点击演示入口会初始化自己的演示空间；按上面步骤即可复现。截图随源码提供。
 
-![本次浏览器操作：资料原文已收藏](assets/whole-system-knowledge.jpg)
+![本次浏览器操作：资料原文已收藏](../assets/whole-system-knowledge.jpg)
 
-![本次浏览器操作：明确标为离线示例的修改稿](assets/whole-system-writing.jpg)
+![本次浏览器操作：明确标为离线示例的修改稿](../assets/whole-system-writing.jpg)
 
 ## 其他专项截图
 
 下图来自自动化操作的合成场景，供理解界面；不是实际学习效果实验。
 
-![考前一天计划](assets/plan-exam-boundary.png)
+![考前一天计划](../assets/plan-exam-boundary.png)
 
-![PDF 第二页来源与收藏](assets/pdf-source-page-detail.png)
+![PDF 第二页来源与收藏](../assets/pdf-source-page-detail.png)
 
-![个人知识与复习记录](assets/personal-memory-desktop.png)
+![个人知识与复习记录](../assets/personal-memory-desktop.png)

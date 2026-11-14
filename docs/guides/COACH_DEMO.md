@@ -4,7 +4,7 @@
 
 The course build adds Task 2 revision coaching, a personal knowledge base and vocabulary learning. It uses training-free retrieval and structured generation. Writing sends a separate background vocabulary request; the **背单词** page combines a locally prepared dictionary with personal practice words. Listening and Reading feed personal records. Task 1 retains the single-assessment interface and also supports independent vocabulary accumulation. See [VOCABULARY_LEARNING.md](VOCABULARY_LEARNING.md).
 
-Follow the complete [first-time installation steps](../README.md#不使用-docker): install Python 3.11–3.14 and Node.js 22+, create `backend/.venv`, install `backend/.[dev]`, and run `npm ci` in `frontend/`. From the repository root, run `npm run setup:vocabulary` to download and generate the ignored local dictionary. This step is required before word study and backend tests; it reuses ready files on later runs and does not need an API key. Copy `.env.example` to the root `.env` if it does not already exist, replace `JWT_SECRET`, and configure:
+Follow the complete [first-time installation steps](../../README.md#不使用-docker): install Python 3.11–3.14 and Node.js 22+, create `backend/.venv`, install `backend/.[dev]`, and run `npm ci` in `frontend/`. From the repository root, run `npm run setup:vocabulary` to download and generate the ignored local dictionary. This step is required before word study and backend tests; it reuses ready files on later runs and does not need an API key. Copy `.env.example` to the root `.env` if it does not already exist, replace `JWT_SECRET`, and configure:
 
 ```env
 COACH_API_KEY=your-key
@@ -68,4 +68,4 @@ npm run test:e2e
 
 Automated backend checks use synthetic responses, in-memory SQLite, and no live keys. Browser fixtures are explicitly synthetic and test layout/interactions, not model quality. Screenshots go to ignored `tmp/`. The live smoke script uses its own temporary SQLite database and project-authored examples, checks initial/revised writing, cited RAG, cross-subject sources, insufficient evidence and offline cache replay, and saves inspectable synthetic outputs to `tmp/coach-live-report.json`. It never reads the developer's learning database.
 
-The course validation register is [COACH_VALIDATION.md](COACH_VALIDATION.md). Broader retrieval benchmarks and human writing calibration in `EVALUATION.md` remain future work, not measured claims.
+The course validation register is [COACH_VALIDATION.md](../history/COACH_VALIDATION.md). Broader retrieval benchmarks and human writing calibration in `EVALUATION.md` remain future work, not measured claims.
