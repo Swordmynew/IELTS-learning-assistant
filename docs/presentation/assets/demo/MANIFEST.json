@@ -1,0 +1,146 @@
+{
+  "mode": "offline + hashing",
+  "syntheticAccount": true,
+  "translatedLabelsForPresentation": true,
+  "records": [
+    {
+      "asset": "profile.png",
+      "route": "/profile",
+      "translatedVisibleStrings": 38,
+      "untranslated": []
+    },
+    {
+      "asset": "profile-targets.png",
+      "route": "/profile",
+      "translatedVisibleStrings": 38,
+      "untranslated": []
+    },
+    {
+      "asset": "profile-minutes.png",
+      "route": "/profile",
+      "translatedVisibleStrings": 38,
+      "untranslated": []
+    },
+    {
+      "asset": "plan-draft.png",
+      "route": "/plan",
+      "translatedVisibleStrings": 55,
+      "untranslated": []
+    },
+    {
+      "asset": "plan-draft-summary.png",
+      "route": "/plan",
+      "translatedVisibleStrings": 55,
+      "untranslated": []
+    },
+    {
+      "asset": "plan-approved.png",
+      "route": "/plan",
+      "translatedVisibleStrings": 56,
+      "untranslated": []
+    },
+    {
+      "asset": "plan-active-summary.png",
+      "route": "/plan",
+      "translatedVisibleStrings": 56,
+      "untranslated": []
+    },
+    {
+      "asset": "task-completed.png",
+      "route": "/plan",
+      "translatedVisibleStrings": 56,
+      "untranslated": []
+    },
+    {
+      "asset": "overview.png",
+      "route": "/",
+      "translatedVisibleStrings": 41,
+      "untranslated": []
+    },
+    {
+      "asset": "word-recall.png",
+      "route": "/vocabulary",
+      "translatedVisibleStrings": 31,
+      "untranslated": []
+    },
+    {
+      "asset": "word-reveal.png",
+      "route": "/vocabulary",
+      "translatedVisibleStrings": 34,
+      "untranslated": []
+    },
+    {
+      "asset": "reading-feedback.png",
+      "route": "/question-bank",
+      "translatedVisibleStrings": 40,
+      "untranslated": []
+    },
+    {
+      "asset": "personal-memory.png",
+      "route": "/resources",
+      "translatedVisibleStrings": 40,
+      "untranslated": []
+    },
+    {
+      "asset": "memory-cards.png",
+      "route": "/resources",
+      "translatedVisibleStrings": 40,
+      "untranslated": []
+    },
+    {
+      "asset": "retrieval-evidence.png",
+      "route": "/resources",
+      "translatedVisibleStrings": 48,
+      "untranslated": []
+    },
+    {
+      "asset": "retrieval-panel.png",
+      "route": "/resources",
+      "translatedVisibleStrings": 48,
+      "untranslated": []
+    },
+    {
+      "asset": "retrieval-first.png",
+      "route": "/resources",
+      "translatedVisibleStrings": 48,
+      "untranslated": []
+    },
+    {
+      "asset": "source-reader.png",
+      "route": "/resources",
+      "translatedVisibleStrings": 26,
+      "untranslated": []
+    },
+    {
+      "asset": "pdf-page-two.png",
+      "route": "/resources",
+      "translatedVisibleStrings": 26,
+      "untranslated": []
+    },
+    {
+      "asset": "writing-v1.png",
+      "route": "/writing",
+      "translatedVisibleStrings": 41,
+      "untranslated": []
+    },
+    {
+      "asset": "writing-hint.png",
+      "route": "/writing",
+      "translatedVisibleStrings": 41,
+      "untranslated": []
+    },
+    {
+      "asset": "writing-v2.png",
+      "route": "/writing",
+      "translatedVisibleStrings": 41,
+      "untranslated": []
+    },
+    {
+      "asset": "assistant-sources.png",
+      "route": "/resources",
+      "translatedVisibleStrings": 58,
+      "untranslated": []
+    }
+  ],
+  "missing": []
+}
