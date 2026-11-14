@@ -9,3 +9,5 @@
 - assets：文档引用的界面截图。
 
 先读根目录 [START_HERE](../START_HERE.md)。
+
+- presentation：[英文PPT](presentation/Group20.pptx)、[六人分工](presentation/PRESENTATION_PLAN_ZH.md)、[逐页大纲](presentation/SLIDE_OUTLINE.md)、[演示操作单](presentation/DEMO_RUNBOOK_ZH.md)、[Q&A](presentation/QA_BANK.md)。

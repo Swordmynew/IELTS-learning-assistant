@@ -2,7 +2,7 @@
 
 ## 接手顺序
 
-先读 [START_HERE](../../START_HERE.md)、[QUICKSTART](../guides/QUICKSTART.md)、[USER_GUIDE](../guides/USER_GUIDE.md) 和 [最新验收](../history/ITERATION_2026-11-12.md)，再跑 [演示步骤](../guides/DEMO_WALKTHROUGH.md)。当前交付为个人仓库 main，克隆和推送说明见 [仓库使用](../guides/GITHUB_WORKFLOW.md)。不要先连接真实数据库或更换环境。
+先读 [START_HERE](../../START_HERE.md)、[QUICKSTART](../guides/QUICKSTART.md)、[USER_GUIDE](../guides/USER_GUIDE.md) 和 [最新验收](../history/ITERATION_2026-11-12.md)，再跑 [演示步骤](../guides/DEMO_WALKTHROUGH.md)。当前交付为团队仓库 ccy最新-20261114，克隆和推送说明见 [仓库使用](../guides/GITHUB_WORKFLOW.md)。不要先连接真实数据库或更换环境。
 
 ## 代码地图
 
@@ -28,7 +28,7 @@
 
 ## 验证命令
 
-在本机现有解释器环境，所有产物留在项目 tmp 子目录：
+在本机现有解释器环境，所有验证产物留在项目 local-data/verification 子目录：
 
 ```powershell
 # 从仓库根目录运行；产物全部放 local-data/verification。
@@ -50,6 +50,6 @@ Playwright 有 14 条模拟接口界面回归与 6 条真实离线 API 流程。
 3. 旧版学习记录、限时练习、材料保护及重排逐项合入，先设计兼容迁移。
 4. PostgreSQL、Redis/RQ、Docker、机构登录、恢复演练及公网部署验收。
 5. OCR、数据库侧检索、独立重排序、指代解析和微练习作为后续候选。
-6. 第 20 组报告与 PPT 按真实功能更新，保留离线演示备份，真实模型效果尚未验证。
+6. 第 20 组报告按真实功能更新；英文 PPT 与六人安排见 docs/presentation，保留离线演示备份，真实模型效果尚未验证。
 
 不要为凑结果编造评分准确率、检索指标或模型调用记录。已实现、已验收和待资源的事项分别记录。

@@ -38,3 +38,7 @@ IELTS Adaptive Coach 是 Next.js + FastAPI 的 IELTS Academic 学习原型，帮
 当前唯一项目入口位于 DSAI5206/group project/IELTS-learning-assistant。[目录结构](PROJECT_STRUCTURE.md) 说明代码分类；运行资料在 local-data，受 Git 忽略保护。当前整理版本准备上传原团队仓库的新分支，个人仓库 main 保留历史交付。旧独有实现已归档，兼容合入待办仍见开发交接。
 
 本轮目录调整与验证见 [整理验收](docs/validation/REORGANIZATION_2026-11-14.md)，重跑命令为 scripts/verify-local.ps1。
+
+## 展示与分工
+
+英文PPT与中文排练材料见 [展示安排](docs/presentation/PRESENTATION_PLAN_ZH.md)。用户版本15分钟讲解/演示＋4分钟Q&A；课程PDF版本14＋4，已有压缩安排。
