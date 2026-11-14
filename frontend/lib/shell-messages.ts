@@ -1,5 +1,13 @@
 export const shellMessages: Record<"zh-CN" | "en", Record<string, string>> = {
   "zh-CN": {
+    "launchpad.heading": "开始练习", "launchpad.time": "可用时间", "launchpad.minuteOption": "{n} 分钟",
+    "launchpad.map": "你的提分地图", "launchpad.current": "当前", "launchpad.target": "目标",
+    "launchpad.focus": "重点练习{skill}", "launchpad.auto": "自动推荐", "launchpad.plan": "来自你的计划",
+    "launchpad.suggested": "建议练习", "launchpad.optional": "自由加练", "launchpad.start": "开始{skill}",
+    "launchpad.review": "打磨一个段落", "launchpad.writing": "展开你的下一个论点", "launchpad.reading": "读懂文章的关键信息",
+    "launchpad.listening": "捕捉听力细节", "launchpad.speaking": "找到口语表达的节奏", "launchpad.vocabulary": "了解你的词汇水平",
+    "launchpad.planLink": "查看周计划", "launchpad.profileLink": "更新学习档案", "launchpad.emptyAction": "设置目标",
+    "launchpad.bandLabel": "{skill}：当前 {current}，目标 {target}",
     "appearance.preferences": "语言与外观", "appearance.theme": "外观模式",
     "appearance.light": "浅色模式", "appearance.dark": "深色模式", "appearance.system": "跟随系统",
     "rag.noRelatedRecords": "未找到与这个问题相关的学习记录或资料。",
@@ -42,6 +50,14 @@ export const shellMessages: Record<"zh-CN" | "en", Record<string, string>> = {
     "error.unresolvedExercises": "你指的是哪几道题？请提供题目关键词，或回到讨论这些题目的原对话继续。",
   },
   en: {
+    "launchpad.heading": "Next up", "launchpad.time": "Time available", "launchpad.minuteOption": "{n} min",
+    "launchpad.map": "Your band map", "launchpad.current": "Current", "launchpad.target": "Target",
+    "launchpad.focus": "Focus on {skill}", "launchpad.auto": "Auto focus", "launchpad.plan": "From your plan",
+    "launchpad.suggested": "Suggested practice", "launchpad.optional": "Optional practice", "launchpad.start": "Start {skill}",
+    "launchpad.review": "Review one paragraph", "launchpad.writing": "Develop your next argument", "launchpad.reading": "Read for the key idea",
+    "launchpad.listening": "Listen for the details", "launchpad.speaking": "Find your speaking rhythm", "launchpad.vocabulary": "Discover your vocabulary level",
+    "launchpad.planLink": "Open weekly plan", "launchpad.profileLink": "Update profile", "launchpad.emptyAction": "Set your goals",
+    "launchpad.bandLabel": "{skill}: current {current}, target {target}",
     "appearance.preferences": "Language and appearance", "appearance.theme": "Color theme",
     "appearance.light": "Light mode", "appearance.dark": "Dark mode", "appearance.system": "Use system theme",
     "rag.noRelatedRecords": "No learning records or sources relevant to this question were found.",

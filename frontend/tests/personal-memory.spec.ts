@@ -5,7 +5,10 @@ test.beforeEach(async ({ page, request }) => {
   const response = await request.post("/api/v1/auth/register", { data: { email: `memory-${crypto.randomUUID()}@example.com`, password: "SyntheticMemory123" } });
   expect(response.status()).toBe(201);
   const token = (await response.json()).access_token;
-  await page.addInitScript(value => localStorage.setItem("ielts-access-token", value), token);
+  await page.addInitScript(value => {
+    localStorage.setItem("ielts-access-token", value);
+    localStorage.setItem("ielts-ui-language", "zh-CN");
+  }, token);
 });
 
 test("real API: note create, edit, retrieval, self-review and delete", async ({ page }) => {

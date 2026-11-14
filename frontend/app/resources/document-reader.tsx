@@ -1,6 +1,6 @@
 "use client";
 
-import { useI18n, localizeError } from "@/lib/i18n";
+import { useI18n, localizeError, apiErrorMessage } from "@/lib/i18n";
 
 import { useQuery } from "@tanstack/react-query";
 import { ExternalLink, X } from "lucide-react";
@@ -22,7 +22,7 @@ export function DocumentReader({ token, id, initialPage, onClose }: { token: str
     setOpening(true); setError("");
     try {
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "/api/v1"}/knowledge/documents/${encodeURIComponent(id)}/file`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!response.ok) throw new Error("error.documentOriginal");
+      if (!response.ok) throw new Error(apiErrorMessage(await response.json().catch(() => ({})), response.status));
       if (fileUrl.current) URL.revokeObjectURL(fileUrl.current);
       fileUrl.current = URL.createObjectURL(await response.blob());
       if (!popup) throw new Error("error.documentPopup");

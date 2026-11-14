@@ -8,6 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import CoachRecord
+from app.services.knowledge_presentation import knowledge_display
 
 TOPICS = {
     "grammar.countability": "不可数名词",
@@ -163,7 +164,9 @@ async def memory_catalog(session: AsyncSession, user_id: str) -> tuple[list[Coac
             visited.add(target)
             target = by_id[target].payload.get("merged_into")
         if target in active:
-            events[target].append({"id": event.id, **event.payload})
+            origin = by_id.get(event.parent_id)
+            display = knowledge_display(origin.source_key or "", event.payload) if origin and event.payload.get("event_type") != "self_review" else {}
+            events[target].append({"id": event.id, **event.payload, **display})
     return [row for row in rows if row.id in active], events
 
 

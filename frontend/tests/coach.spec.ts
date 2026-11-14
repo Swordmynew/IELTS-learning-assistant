@@ -12,7 +12,10 @@ const versions = [0, 1].map(index => ({ id: `v${index + 1}`, created_at: "2026-1
 const demo = { mode: "demo", prompt, knowledge: [{ title: "however", category: "vocabulary", content: "示例词汇记录" }], versions: [0, 1].map(index => ({ essay: index ? revised : essay, issues: [{ title: "连接关系", quote: index ? revised : essay, text: "检查真实的逻辑关系。", source: "原创示例" }], hints: ["两句是什么关系？", "先识别逻辑关系。", "For example, targeted grants help students."] })), answer: "示例跨科目回答。", citations: [source] };
 
 async function setup(page: Page) {
-  await page.addInitScript(() => localStorage.setItem("ielts-access-token", "synthetic-browser-token"));
+  await page.addInitScript(() => {
+    localStorage.setItem("ielts-access-token", "synthetic-browser-token");
+    localStorage.setItem("ielts-ui-language", "zh-CN");
+  });
   await page.route("**/api/v1/**", async route => {
     const path = new URL(route.request().url()).pathname;
     let data: unknown = [];

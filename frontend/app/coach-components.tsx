@@ -7,6 +7,7 @@ import { BookOpen, ChevronRight, ExternalLink, LoaderCircle, Send, X } from "luc
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { Answer, coach, Source } from "@/lib/coach";
+import { demoView } from "@/lib/system-content";
 import { SaveNoteButton } from "./resources/knowledge-editor";
 
 export const typeLabels: Record<string, string> = { all: "ui.all", note: "ui.quickNotes", general: "ui.general", public: "ui.publicSources", document: "ui.myDocuments", vocabulary: "ui.words", mistake: "ui.mistakes", writing: "ui.writing", reading: "ui.reading", listening: "ui.listening", speaking: "ui.speaking", live: "ui.liveFeedback", cache: "ui.cachedResponse", demo: "ui.offlineDemo", offline: "ui.offline", insufficient: "ui.insufficientEvidence" };
@@ -48,7 +49,7 @@ export function DemoPanel({ token, onClose }: { token: string; onClose: () => vo
   const [version, setVersion] = useState(0);
   const [hint, setHint] = useState(0);
   if (!demo.data) return <div className="panel">{demo.error ? localizeError(demo.error.message) : t("ui.loadingDemo")}<button onClick={onClose}>{t("ui.close")}</button></div>;
-  const data = demo.data, current = data.versions[version];
+  const data = demoView(demo.data), current = data.versions[version];
   return <section className="panel coach-demo">
     <header className="coach-section-heading"><div><span className="coach-chip demo">{t("ui.offlineDemo")}</span><h2>{t("ui.fromReadingVocabularyToEssayRevision")}</h2></div><button className="coach-icon-button" onClick={onClose} aria-label={t("ui.closeDemo")}><X /></button></header>
     <div className="coach-demo-memory">{data.knowledge.map(item => <article key={item.title}><span className="coach-chip">{t(typeLabels[item.category] ?? "")}</span><strong>{item.title}</strong><p>{item.content}</p></article>)}</div>

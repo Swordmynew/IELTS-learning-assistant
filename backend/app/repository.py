@@ -140,6 +140,27 @@ async def get_active_plan(session: AsyncSession, user_id: str) -> StudyPlan | No
     return plan_from_row(row) if row else None
 
 
+async def get_draft_plan(session: AsyncSession, user_id: str) -> StudyPlan | None:
+    """Recover the latest actionable draft without treating it as an active plan."""
+    from app.services.learning_time import learning_today
+
+    row = await session.scalar(
+        select(StudyPlanRow)
+        .where(StudyPlanRow.user_id == user_id, StudyPlanRow.status == PlanStatus.draft.value)
+        .order_by(StudyPlanRow.created_at.desc(), StudyPlanRow.id.desc())
+        .limit(1)
+    )
+    if not row:
+        return None
+    plan = plan_from_row(row)
+    stored = await get_profile(session, user_id)
+    if not stored or stored[0].exam_date <= learning_today() or plan.starts_on != learning_today():
+        return None
+    if row.payload.get("planning_context") != await planning_context(session, user_id):
+        return None
+    return plan
+
+
 async def approve_plan(session: AsyncSession, user_id: str, plan_id: str) -> StudyPlan:
     from app.services.learning_time import learning_today
     from app.services.planner import validate_plan

@@ -5,7 +5,7 @@ export const messages: Record<"zh-CN" | "en", Record<string, string>> = {
     "ui.quickNotes": "碎片笔记",
     "ui.general": "通用",
     "ui.publicSources": "公共依据",
-    "ui.myDocuments": "我的笔记",
+    "ui.myDocuments": "我的资料",
     "ui.words": "单词",
     "ui.mistakes": "错题",
     "ui.writing": "写作",

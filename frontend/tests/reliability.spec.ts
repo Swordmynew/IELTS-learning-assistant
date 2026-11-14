@@ -3,7 +3,10 @@ import { test, expect } from "@playwright/test";
 test.beforeEach(async ({ page, request }) => {
   const response = await request.post("/api/v1/auth/register", { data: { email: `reliability-${crypto.randomUUID()}@example.com`, password: "SyntheticPlanning123" } });
   expect(response.status()).toBe(201);
-  await page.addInitScript(token => localStorage.setItem("ielts-access-token", token), (await response.json()).access_token);
+  await page.addInitScript(token => {
+    localStorage.setItem("ielts-access-token", token);
+    localStorage.setItem("ielts-ui-language", "zh-CN");
+  }, (await response.json()).access_token);
 });
 
 function profile(days: number, minutes: number) {

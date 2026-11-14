@@ -36,6 +36,7 @@ from app.repository import (
     approve_plan,
     complete_task,
     get_active_plan,
+    get_draft_plan,
     get_latest_assessment,
     get_latest_vocabulary_test,
     get_plan,
@@ -370,6 +371,7 @@ async def dashboard(
     return DashboardSummary(
         profile=stored[0] if stored else None,
         active_plan=plan,
+        draft_plan=await get_draft_plan(session, user.id),
         completed_tasks=completed,
         total_tasks=total,
         latest_assessment=await get_latest_assessment(session, user.id),

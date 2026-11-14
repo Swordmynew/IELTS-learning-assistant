@@ -12,6 +12,7 @@ import { api, WritingAssessment } from "@/lib/api";
 import { CoachWriter } from "./coach-writer";
 import { coach } from "@/lib/coach";
 import { WritingWords } from "./writing-words";
+import { writingAssessmentView } from "@/lib/system-content";
 import "./writer.css";
 
 const criterionLabels: Record<string, string> = { task_achievement: "ui.taskResponse", coherence_cohesion: "ui.coherenceAndCohesion", lexical_resource: "ui.lexicalResource", grammar_accuracy: "ui.grammaticalRangeAndAccuracy" };
@@ -54,7 +55,8 @@ function WritingContent() {
     mutationFn: () => api.assessWriting(token!, { task_type: taskType, prompt, essay }),
     onSuccess: (value) => { setResult(value); client.invalidateQueries({ queryKey: ["dashboard"] }); },
   });
-  const assessment = result ?? dashboard.data?.latest_assessment;
+  const rawAssessment = result ?? dashboard.data?.latest_assessment;
+  const assessment = rawAssessment ? writingAssessmentView(rawAssessment) : rawAssessment;
   const words = essay.trim() ? essay.trim().split(/\s+/).length : 0;
 
   return <main className="page writing-page">
@@ -69,7 +71,7 @@ function WritingContent() {
         {assess.error && <p className="error-text">{t("common.errorAssessing", { error: localizeError(assess.error.message) })}</p>}
       </section>
       <section className="panel assessment-panel">
-        {assessment ? <><div className="assessment-head"><div><p className="eyebrow">{t("ui.estimatedWritingBand")}</p><strong>{assessment.estimated_overall_band}</strong><span>{t("writing.modelUsed", { model: assessment.model_used })}</span></div></div>
+        {assessment ? <><div className="assessment-head"><div><p className="eyebrow">{t("ui.estimatedWritingBand")}</p><strong>{assessment.estimated_overall_band}</strong><span>{t("writing.modelUsed", { model: assessment.model_used === "deterministic-demo-baseline" ? t("system.writing.baseline") : assessment.model_used })}</span></div></div>
           <div className="criteria-grid">{assessment.criteria.map((item) => <article key={item.criterion}><div><span>{t(criterionLabels[item.criterion] ?? "")}</span><strong>{item.band}</strong></div><p>{item.explanation}</p>{item.evidence[0] && <blockquote>“{item.evidence[0].quote}”</blockquote>}{item.citations[0] && <a href={item.citations[0].url} target="_blank">{t("ui.viewAssessmentSources")}<ExternalLink size={13} /></a>}</article>)}</div>
           <div className="feedback-section"><h3>{t("ui.revisionPriorities")}</h3><ol>{assessment.top_priorities.map((item) => <li key={item}>{item}</li>)}</ol></div>
           <details className="feedback-section"><summary>{t("ui.samplePassageRevision")}</summary><p>{assessment.rewrite_example}</p></details>

@@ -159,6 +159,9 @@ def test_stream_emits_executed_nodes_and_persisted_plan_then_replays():
         assert [event["node"] for event in stream if event.get("node")] == ["intake", "diagnose", "retrieve", "plan", "validate"]
         complete = stream[-1]
         assert complete["status"] == "completed" and complete["plan_id"] == complete["plan"]["id"]
+        recovered = client.get("/api/v1/dashboard", headers=headers).json()
+        assert recovered["draft_plan"] == complete["plan"]
+        assert recovered["active_plan"] is None
         run = client.get(f"/api/v1/agent/runs/{complete['run_id']}", headers=headers).json()
         assert run["status"] == "waiting_for_approval" and run["finished_at"]
         assert run["trace"][-1]["plan_id"] == complete["plan_id"]
@@ -166,6 +169,38 @@ def test_stream_emits_executed_nodes_and_persisted_plan_then_replays():
         assert len(replay) == 1 and replay[0]["replayed"] and replay[0]["plan_id"] == complete["plan_id"]
         other = account(client)
         assert client.get(f"/api/v1/agent/runs/{complete['run_id']}", headers=other).status_code == 404
+        assert client.get("/api/v1/dashboard", headers=other).json()["draft_plan"] is None
+
+
+def test_dashboard_recovers_latest_draft_without_replacing_active_plan():
+    with TestClient(app) as client:
+        headers = account(client)
+        active = client.post("/api/v1/plans/generate", headers=headers).json()
+        assert client.post(f"/api/v1/plans/{active['id']}/approve", headers=headers, json={"approved": True}).status_code == 200
+        client.post("/api/v1/plans/generate", headers=headers)
+        latest = client.post("/api/v1/plans/generate", headers=headers).json()
+        for _ in range(2):
+            recovered = client.get("/api/v1/dashboard", headers=headers).json()
+            assert recovered["draft_plan"] == latest
+            assert recovered["active_plan"]["id"] == active["id"]
+            assert recovered["total_tasks"] == len(active["tasks"])
+        assert client.post(f"/api/v1/plans/{latest['id']}/approve", headers=headers, json={"approved": True}).status_code == 200
+        recovered = client.get("/api/v1/dashboard", headers=headers).json()
+        assert recovered["active_plan"]["id"] == latest["id"]
+        assert recovered["draft_plan"] is None
+
+
+def test_dashboard_does_not_restore_invalidated_or_previous_day_drafts(monkeypatch):
+    with TestClient(app) as client:
+        headers = account(client)
+        client.post("/api/v1/plans/generate", headers=headers)
+        assert client.get("/api/v1/dashboard", headers=headers).json()["draft_plan"] is not None
+        assert client.post("/api/v1/diagnostics", headers=headers, json=learner(minutes=30).model_dump(mode="json")).status_code == 200
+        assert client.get("/api/v1/dashboard", headers=headers).json()["draft_plan"] is None
+        client.post("/api/v1/plans/generate", headers=headers)
+        tomorrow = learning_today() + timedelta(days=1)
+        monkeypatch.setattr("app.services.learning_time.learning_today", lambda: tomorrow)
+        assert client.get("/api/v1/dashboard", headers=headers).json()["draft_plan"] is None
 
 
 def test_stream_failure_has_no_fake_completion_or_saved_plan(monkeypatch):

@@ -1,4 +1,4 @@
-import { localizeError, translate } from "./i18n";
+import { apiErrorMessage, translate } from "./i18n";
 
 export type Skill = "listening" | "reading" | "writing" | "speaking";
 export type PlanSkill = Skill | "vocabulary";
@@ -81,6 +81,7 @@ export interface Dashboard {
   learning_today?: string;
   profile: Profile | null;
   active_plan: StudyPlan | null;
+  draft_plan: StudyPlan | null;
   completed_tasks: number;
   total_tasks: number;
   latest_assessment: WritingAssessment | null;
@@ -193,7 +194,7 @@ async function request<T>(path: string, init: RequestInit = {}, token?: string):
   });
   if (!response.ok) {
     const payload = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(localizeError(typeof payload.detail === "string" ? payload.detail : JSON.stringify(payload.detail)));
+    throw new Error(apiErrorMessage(payload, response.status));
   }
   if (response.status === 204) return undefined as T;
   return response.json() as Promise<T>;
@@ -205,7 +206,11 @@ export async function generatePlanStream(token: string, onProgress: (event: Plan
   const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL ?? "/api/v1"}/agent/runs/stream`, {
     method: "POST", headers: { Authorization: `Bearer ${token}`, "Idempotency-Key": crypto.randomUUID() },
   });
-  if (!response.ok || !response.body) throw new Error(translate("error.planConnection"));
+  if (!response.ok) {
+    const payload = await response.json().catch(() => ({}));
+    throw new Error(apiErrorMessage(payload, response.status));
+  }
+  if (!response.body) throw new Error(translate("error.planConnection"));
   const reader = response.body.getReader();
   const decoder = new TextDecoder();
   let buffer = "";
@@ -220,7 +225,7 @@ export async function generatePlanStream(token: string, onProgress: (event: Plan
         const data = frame.split("\n").filter(line => line.startsWith("data:")).map(line => line.slice(5).trim()).join("\n");
         if (!data) continue;
         const event = JSON.parse(data) as PlanningProgress & { detail?: string; plan?: StudyPlan };
-        if (event.status === "failed") throw new Error(event.detail ? localizeError(event.detail) : translate("error.planFailed"));
+        if (event.status === "failed") throw new Error(event.detail ? apiErrorMessage({ detail: event.detail }, 500) : translate("error.planFailed"));
         onProgress(event);
         if (event.status === "completed" && event.plan && event.plan.id === event.plan_id) result = event.plan;
       }

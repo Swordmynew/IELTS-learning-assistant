@@ -1,4 +1,4 @@
-import { localizeError, translate } from "./i18n";
+import { apiErrorMessage } from "./i18n";
 
 export interface WordSource {
   reason: "spelling" | "usage" | "accumulate"; original_form: string; original_quote: string;
@@ -30,7 +30,7 @@ async function request<T>(token: string, path: string, method = "GET", body?: un
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({}));
-    throw new VocabularyRequestError(response.status, response.status === 409 ? translate("error.cardChanged") : typeof error.detail === "string" ? localizeError(error.detail) : translate("error.save"));
+    throw new VocabularyRequestError(response.status, apiErrorMessage(error, response.status));
   }
   return response.json();
 }

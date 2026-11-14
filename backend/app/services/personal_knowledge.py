@@ -14,6 +14,7 @@ from app.db import (
     WritingAssessmentRow,
 )
 from app.services.embeddings import embed_text
+from app.services.knowledge_presentation import knowledge_display
 from app.services.learning_memory import invalidate_memory, record_event, topics_for
 
 
@@ -327,7 +328,8 @@ def knowledge_view(row: CoachRecord) -> dict:
     if "merged_records" in data:
         data["merged_records"] = {
             key: {**{k: v for k, v in item.items() if k not in {"pending", "confirmed"}},
+                  **knowledge_display(key, item),
                   "source_summary": knowledge_source_summary(item)}
             for key, item in data["merged_records"].items()
         }
-    return {"id": row.id, **data, "topic_tags": topics_for(data)}
+    return {"id": row.id, **data, **knowledge_display(row.source_key or "", data), "topic_tags": topics_for(data)}

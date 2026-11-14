@@ -6,7 +6,10 @@ const word = { word: "benefit", meaning: "使受益；益处", phonetic: "ˈben�
 async function setup(page: Page) {
   let saved = { ...word };
   let extracted = false;
-  await page.addInitScript(() => localStorage.setItem("ielts-access-token", "synthetic-word-browser-token"));
+  await page.addInitScript(() => {
+    localStorage.setItem("ielts-access-token", "synthetic-word-browser-token");
+    localStorage.setItem("ielts-ui-language", "zh-CN");
+  });
   await page.route("**/api/v1/**", async route => {
     const url = new URL(route.request().url()), path = url.pathname;
     let data: unknown = [];

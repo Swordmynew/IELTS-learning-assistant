@@ -271,6 +271,7 @@ class DashboardSummary(BaseModel):
     learning_today: date = Field(default_factory=learning_today)
     profile: LearnerProfileRead | None
     active_plan: StudyPlan | None
+    draft_plan: StudyPlan | None = None
     completed_tasks: int
     total_tasks: int
     latest_assessment: WritingAssessment | None

@@ -1,5 +1,5 @@
 import type { WritingAssessment } from "./api";
-import { localizeError, translate } from "./i18n";
+import { apiErrorMessage } from "./i18n";
 
 export interface Source {
   source_id: string; title: string; excerpt: string; source_type: string;
@@ -10,9 +10,10 @@ export interface Source {
 export interface KnowledgeItem {
   id: string; title: string; content: string; note?: string; category: string;
   module: string; source_summary?: string; status: string; source_link: string;
+  title_message_key?: string; display_fields?: DisplayField[];
   source_kind?: string; source_url?: string; topic_tags?: string[]; related_ids?: string[];
   state_source?: string; practice_count?: number; mistake_count?: number; last_practiced_at?: string;
-  merged_records?: Record<string, { title: string; content: string; source_link: string; source_summary?: string; note?: string }>;
+  merged_records?: Record<string, { title: string; title_message_key?: string; display_fields?: DisplayField[]; content: string; source_link: string; source_summary?: string; note?: string }>;
 }
 export interface Issue { id: string; criterion: string; quote: string; explanation: string; goal: string; source_ids: string[] }
 export interface Feedback {
@@ -28,7 +29,8 @@ export interface KnowledgeDraft {
   title: string; content: string; note: string; module: string; topic_tags: string[]; related_ids: string[]; source_url?: string | null; request_id: string;
 }
 export interface BookmarkSource { source_type: "question" | "writing_version" | "conversation" | "document"; source_id: string; message_index?: number; chunk_id?: string }
-export interface MemoryEvent { id: string; event_type: string; occurred_at: string; title: string; content: string; status: string; provenance: string }
+export interface DisplayField { label_key: string; value: string; value_key?: string }
+export interface MemoryEvent { id: string; event_type: string; occurred_at: string; title: string; content: string; display_fields?: DisplayField[]; status: string; provenance: string }
 export interface KnowledgeTopics { presets: { id: string; label: string }[]; items: { id: string; label: string; item_ids: string[]; note_count: number; unresolved_count: number; mistake_count: number }[] }
 export interface Answer { answer: string; citations: Source[]; mode: string; conversation_id?: string; generated_at?: string; context_stale?: boolean; failure_reason?: string | null; system_message_key?: string | null; generation_mode?: string | null; retrieved_sources?: Source[] }
 export interface Conversation { id: string; parent_id?: string; messages: (Answer & { query: string })[]; scope?: { source_type: string; document_ids: string[]; topic_tags?: string[] } }
@@ -45,7 +47,7 @@ async function call<T>(token: string, path: string, method = "GET", body?: unkno
   });
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: response.statusText }));
-    throw new Error(typeof error.detail === "string" ? localizeError(error.detail) : translate("error.request"));
+    throw new Error(apiErrorMessage(error, response.status));
   }
   return response.status === 204 ? undefined as T : response.json();
 }
